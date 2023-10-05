@@ -381,7 +381,7 @@ fn update_slackers(
 }
 
 pub async fn check_channels_loop(plugin: Plugin<PluginState>) -> Result<(), Error> {
-    time::sleep(Duration::from_secs(60)).await;
+    time::sleep(Duration::from_secs(600)).await;
     loop {
         {
             match check_channel(plugin.clone()).await {
