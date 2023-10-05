@@ -53,7 +53,7 @@ How to configure telegram notifications:
 * ``vitality-amboss`` ``default: false`` enable/disable pinging amboss for online status. Settings for online status visibility on your amboss page is here: [amboss](https://amboss.space/settings?page=monitoring)  Grace period needs to be 15min or higher, since we send every 5 minutes
 * ``vitality-expiring-htlcs`` ``default: 0`` (off) check channels for expiring htlcs (with less than X blocks remaining) and does a reconnect in hope of fix
 * ``vitality-watch-channels`` ``default: true`` check channels for errors in status, but not in closing state (sometimes needs manual force close), or disconnected peers that don't want to reconnect (e.g. can't agree on fees)
-* ``vitality-watch-gossip`` ``default: false`` compare local channel info with local gossip info, checks for correct public and active values in gossip and missing gossip. Does a reconnect in hope of fix
+* ``vitality-watch-gossip`` ``default: false`` compare local channel info with local gossip info, checks for correct public and active values in gossip and missing gossip. Might get skipped if gossip content is low (e.g. lightningd deleted ``gossip.store`` or it got corrupted and is rebuilding). Does a reconnect in hope of fix
 * ``vitality-telegram-token`` your telegram bot token
 * ``vitality-telegram-usernames`` actually your chatid with the telegram bot, can be used multiple times
 * ``vitality-smtp-username`` smtp username for email notifications
