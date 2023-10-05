@@ -37,6 +37,8 @@ You can configure what the plugin checks for and optionally get notified with th
 
 These have to be in the ``config`` file in your ``lightning-dir`` (usually ``~/.lightning/config`` or ``~/.lightning/<network>/config``). The plugin is unable to read configs somewhere else, e.g. ``/etc/lightningd/config`` or from the cli.
 
+The channel health checks happen a minute after start of the plugin and then every hour, so we don't disconnect from peers more than once an hour.
+
 This is a dynamic plugin that can be started/stopped independently of CLN.
 
 ### Telegram
@@ -48,7 +50,7 @@ How to configure telegram notifications:
 * set the options for token and chatid(s) with the options below
 
 ### Options
-* ``vitality-amboss`` ``default: false`` enable/disable pinging amboss for online status every 5 minutes. Settings for online status visibility on your amboss page is here: [amboss](https://amboss.space/settings?page=monitoring)  
+* ``vitality-amboss`` ``default: false`` enable/disable pinging amboss for online status. Settings for online status visibility on your amboss page is here: [amboss](https://amboss.space/settings?page=monitoring)  Grace period needs to be 15min or higher, since we send every 5 minutes
 * ``vitality-expiring-htlcs`` ``default: 0`` (off) check channels for expiring htlcs (with less than X blocks remaining) and does a reconnect in hope of fix
 * ``vitality-watch-channels`` ``default: true`` check channels for errors in status, but not in closing state (sometimes needs manual force close), or disconnected peers that don't want to reconnect (e.g. can't agree on fees)
 * ``vitality-watch-gossip`` ``default: false`` compare local channel info with local gossip info, checks for correct public and active values in gossip and missing gossip. Does a reconnect in hope of fix
