@@ -35,7 +35,7 @@ After that the binary will be here: ``target/release/vitality``
 ### Usage
 You can configure what the plugin checks for and if and how you get notified with the options below.
 
-These have to be in the ``config`` file in your ``lightning-dir`` (usually ``~/.lightning/config`` or ``~/.lightning/<network>/config``). The plugin is unable to read configs somewhere else, e.g. ``/etc/lightningd/config``.
+These have to be in the ``config`` file in your ``lightning-dir`` (usually ``~/.lightning/config`` or ``~/.lightning/<network>/config``). The plugin is unable to read configs somewhere else, e.g. ``/etc/lightningd/config`` or from the cli.
 
 This is a dynamic plugin that can be started/stopped independently of CLN.
 
