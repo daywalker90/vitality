@@ -19,7 +19,7 @@ mod util;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    std::env::set_var("CLN_PLUGIN_LOG", "trace");
+    std::env::set_var("CLN_PLUGIN_LOG", "cln_plugin=info,cln_rpc=info,debug");
     log_panics::init();
     let state = PluginState::new();
     // let defaultconfig = Config::new();
