@@ -33,7 +33,7 @@ Install a recent rust version ([rustup](https://rustup.rs/) is recommended) and 
 After that the binary will be here: ``target/release/vitality``
 
 ### Usage
-You can configure what the plugin checks for and if and how you get notified with the options below.
+You can configure what the plugin checks for and optionally get notified with the options below.
 
 These have to be in the ``config`` file in your ``lightning-dir`` (usually ``~/.lightning/config`` or ``~/.lightning/<network>/config``). The plugin is unable to read configs somewhere else, e.g. ``/etc/lightningd/config`` or from the cli.
 
@@ -62,7 +62,7 @@ How to configure telegram notifications:
 * ``vitality-email-to`` email to send to for email notifications
 
 ### Example
-Example config:
+Example config with everything enabled, checking for htlcs that are closer than 50 blocks to expiry and notifications via telegram and email:
 ```
 vitality-amboss=true
 vitality-expiring-htlcs=50
