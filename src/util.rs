@@ -66,8 +66,7 @@ pub async fn send_mail(
 
     let tls_parameters = TlsParameters::builder(config.smtp_server.1.clone())
         .dangerous_accept_invalid_certs(false)
-        .dangerous_accept_invalid_hostnames(false)
-        .build_native()?;
+        .build_rustls()?;
 
     let mailer = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.smtp_server.1)?
         .credentials(creds)
