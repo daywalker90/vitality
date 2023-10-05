@@ -3,13 +3,16 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Error};
 use cln_plugin::Plugin;
 use cln_rpc::{
-    model::requests::{
-        ConnectRequest, DisconnectRequest, GetinfoRequest, ListchannelsRequest,
-        ListpeerchannelsRequest, SignmessageRequest,
-    },
     model::responses::{
         ConnectResponse, DisconnectResponse, GetinfoResponse, ListchannelsResponse,
         ListpeerchannelsResponse, SignmessageResponse,
+    },
+    model::{
+        requests::{
+            ConnectRequest, DisconnectRequest, GetinfoRequest, ListchannelsRequest,
+            ListnodesRequest, ListpeerchannelsRequest, SignmessageRequest,
+        },
+        responses::ListnodesResponse,
     },
     primitives::{PublicKey, ShortChannelId},
     ClnRpc, Request, Response,
@@ -35,6 +38,21 @@ pub async fn test_notifications(
         send_telegram(&config, &subject, &body).await?;
     }
     Ok(json!({"format-hint":"simple","result":"success"}))
+}
+
+pub async fn list_nodes(
+    rpc_path: &PathBuf,
+    peer: Option<PublicKey>,
+) -> Result<ListnodesResponse, Error> {
+    let mut rpc = ClnRpc::new(&rpc_path).await?;
+    let listnodes_request = rpc
+        .call(Request::ListNodes(ListnodesRequest { id: peer }))
+        .await
+        .map_err(|e| anyhow!("Error calling list_nodes: {}", e.to_string()))?;
+    match listnodes_request {
+        Response::ListNodes(info) => Ok(info),
+        e => Err(anyhow!("Unexpected result in list_nodes: {:?}", e)),
+    }
 }
 
 pub async fn signmessage(

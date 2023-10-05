@@ -14,7 +14,7 @@ use log::{debug, info, warn};
 use tokio::time::{self, Instant};
 
 use crate::{
-    rpc::{connect, disconnect, get_info, list_channels, list_peer_channels},
+    rpc::{connect, disconnect, get_info, list_channels, list_nodes, list_peer_channels},
     structs::{Config, PluginState},
     util::{make_rpc_path, send_mail, send_telegram},
 };
@@ -37,6 +37,12 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
 
     let current_blockheight = get_info.blockheight;
     let network = get_info.network;
+
+    let list_nodes = list_nodes(&rpc_path, None).await?.nodes;
+    let alias_map = list_nodes
+        .into_iter()
+        .filter_map(|a| a.alias.map(|alias| (a.nodeid, alias)))
+        .collect::<HashMap<PublicKey, String>>();
 
     let gossip = if config.watch_gossip.1 {
         Some(get_gossip_map(&rpc_path).await?)
@@ -89,6 +95,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
     }
 
     if !peer_slackers.is_empty() {
+        info!("check_channel: Waiting 10s");
         time::sleep(Duration::from_secs(10)).await;
     }
 
@@ -110,6 +117,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
     }
 
     if !peer_slackers.is_empty() {
+        info!("check_channel: Waiting 30s");
         time::sleep(Duration::from_secs(30)).await;
     }
 
@@ -138,14 +146,18 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
             .into_iter()
             .map(|(p, s)| {
                 let concatenated_string = s.join("\n");
-                p.to_string() + ":\n" + &concatenated_string + "\n"
+                if let Some(alias) = alias_map.get(&p) {
+                    format!("{} ({}):\n{}\n", p, alias, concatenated_string)
+                } else {
+                    format!("{}:\n{}\n", p, concatenated_string)
+                }
             })
             .collect();
         info!(
-            "check_channel: Sending mailreport. Duration: {}s",
+            "check_channel: Sending notifications. Duration: {}s",
             now.elapsed().as_secs()
         );
-        let subject = "Channel check report".to_string();
+        let subject = "Channel check report\n".to_string();
         let body = final_peer_slackers.join("\n");
         if config.send_mail {
             send_mail(&config, &subject, &body, false).await?;
@@ -177,10 +189,12 @@ fn check_slackers(
         } else {
             continue;
         };
+
         match state {
             ListpeerchannelsChannelsState::CHANNELD_NORMAL
             | ListpeerchannelsChannelsState::CHANNELD_AWAITING_SPLICE => {
                 let connected = chan.peer_connected.unwrap();
+                let peer_id = chan.peer_id.unwrap();
                 if config.watch_channels.1 {
                     let statuses = chan.status.as_ref().unwrap();
                     let mut contained_reconnect = false;
@@ -189,12 +203,12 @@ fn check_slackers(
                             warn!(
                                 "check_channel: Found peer with error in status but not \
                                 in closing state: {} status: {}",
-                                chan.peer_id.unwrap().to_string(),
+                                peer_id.to_string(),
                                 status
                             );
                             update_slackers(
                                 peer_slackers,
-                                chan.peer_id.unwrap(),
+                                peer_id,
                                 format!(
                                     "Found peer with error in status but not \
                                 in closing state. Status: {}",
@@ -210,12 +224,12 @@ fn check_slackers(
                         warn!(
                             "check_channel: Found disconnected peer that does not want to \
                             reconnect: {} status instead is: {}",
-                            chan.peer_id.unwrap().to_string(),
+                            peer_id.to_string(),
                             statuses.join("\n")
                         );
                         update_slackers(
                             peer_slackers,
-                            chan.peer_id.unwrap(),
+                            peer_id,
                             format!(
                                 "Found disconnected peer that does not want to \
                             reconnect. Status instead is: {}",
@@ -232,13 +246,13 @@ fn check_slackers(
                                 warn!(
                                     "check_channel: Found peer {} with channel {} with close \
                                     to expiry htlc: {} blocks",
-                                    chan.peer_id.unwrap(),
+                                    peer_id,
                                     chan.short_channel_id.unwrap().to_string(),
                                     expiry - current_blockheight
                                 );
                                 update_slackers(
                                     peer_slackers,
-                                    chan.peer_id.unwrap(),
+                                    peer_id,
                                     format!(
                                         "Found channel {} with close to expiry htlc: {} blocks",
                                         chan.short_channel_id.unwrap().to_string(),
@@ -263,12 +277,12 @@ fn check_slackers(
                                 warn!(
                                     "check_channel: Found connected peer {} with channel {} \
                                     with one-sided gossip",
-                                    chan.peer_id.unwrap().to_string(),
+                                    peer_id.to_string(),
                                     chan.short_channel_id.unwrap().to_string()
                                 );
                                 update_slackers(
                                     peer_slackers,
-                                    chan.peer_id.unwrap(),
+                                    peer_id,
                                     format!(
                                         "Found connected channel {} with one-sided gossip",
                                         chan.short_channel_id.unwrap().to_string()
@@ -280,12 +294,12 @@ fn check_slackers(
                                         warn!(
                                         "check_channel: Found connected peer {} with channel {} \
                                         with inactive gossip",
-                                        chan.peer_id.unwrap().to_string(),
+                                        peer_id.to_string(),
                                         chan.short_channel_id.unwrap().to_string()
                                     );
                                         update_slackers(
                                             peer_slackers,
-                                            chan.peer_id.unwrap(),
+                                            peer_id,
                                             format!(
                                                 "Found connected channel {} with inactive gossip",
                                                 chan.short_channel_id.unwrap().to_string()
@@ -296,12 +310,12 @@ fn check_slackers(
                                         warn!(
                                             "check_channel: Found public peer {} with channel {} \
                                         with non-public gossip",
-                                            chan.peer_id.unwrap().to_string(),
+                                            peer_id.to_string(),
                                             chan.short_channel_id.unwrap().to_string()
                                         );
                                         update_slackers(
                                             peer_slackers,
-                                            chan.peer_id.unwrap(),
+                                            peer_id,
                                             format!(
                                                 "Found public channel {} with non-public gossip",
                                                 chan.short_channel_id.unwrap().to_string()
@@ -313,12 +327,12 @@ fn check_slackers(
                         } else {
                             warn!(
                                 "check_channel: Found peer {} with channel {} with no gossip",
-                                chan.peer_id.unwrap(),
+                                peer_id,
                                 chan.short_channel_id.unwrap().to_string()
                             );
                             update_slackers(
                                 peer_slackers,
-                                chan.peer_id.unwrap(),
+                                peer_id,
                                 format!(
                                     "Found channel {} with no gossip",
                                     chan.short_channel_id.unwrap().to_string()
@@ -336,6 +350,7 @@ fn check_slackers(
 async fn get_gossip_map(
     rpc_path: &PathBuf,
 ) -> Result<HashMap<ShortChannelId, Vec<ListchannelsChannels>>, Error> {
+    let now = Instant::now();
     debug!("check_channel: getting gossip...");
     let mut map: HashMap<ShortChannelId, Vec<ListchannelsChannels>> = HashMap::new();
     for list_channels in list_channels(rpc_path, None, None, None).await?.channels {
@@ -345,7 +360,11 @@ async fn get_gossip_map(
             map.insert(list_channels.short_channel_id, vec![list_channels]);
         }
     }
-    debug!("check_channel: gossip size: {}", map.len());
+    debug!(
+        "check_channel: got gossip in {}ms, gossip size: {}",
+        now.elapsed().as_millis(),
+        map.len()
+    );
     Ok(map)
 }
 
