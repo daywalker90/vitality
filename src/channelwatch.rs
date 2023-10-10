@@ -216,6 +216,18 @@ fn check_slackers(
                                 ),
                             );
                         }
+                        if status.to_lowercase().contains("update_fee") {
+                            warn!(
+                                "check_channel: Can't agree on fee with: {} status: {}",
+                                peer_id.to_string(),
+                                status
+                            );
+                            update_slackers(
+                                peer_slackers,
+                                peer_id,
+                                format!("Can't agree on fee. Status: {}", status),
+                            );
+                        }
                         if status.to_lowercase().contains("will attempt reconnect") {
                             contained_reconnect = true;
                         }
