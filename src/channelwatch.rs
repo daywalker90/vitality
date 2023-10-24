@@ -198,6 +198,7 @@ fn check_slackers(
                 if config.watch_channels.1 {
                     let statuses = chan.status.as_ref().unwrap();
                     let mut contained_reconnect = false;
+                    let mut specific_error_found = false;
                     for status in statuses {
                         if status.to_lowercase().contains("error") {
                             warn!(
@@ -215,6 +216,7 @@ fn check_slackers(
                                     status
                                 ),
                             );
+                            specific_error_found = true;
                         }
                         if status.to_lowercase().contains("update_fee") {
                             warn!(
@@ -227,12 +229,13 @@ fn check_slackers(
                                 peer_id,
                                 format!("Can't agree on fee. Status: {}", status),
                             );
+                            specific_error_found = true;
                         }
                         if status.to_lowercase().contains("will attempt reconnect") {
                             contained_reconnect = true;
                         }
                     }
-                    if !connected && !contained_reconnect {
+                    if !connected && !contained_reconnect && !specific_error_found {
                         warn!(
                             "check_channel: Found disconnected peer that does not want to \
                             reconnect: {} status instead is: {}",
