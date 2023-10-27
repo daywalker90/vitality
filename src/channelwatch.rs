@@ -407,10 +407,14 @@ pub async fn check_channels_loop(plugin: Plugin<PluginState>) -> Result<(), Erro
                     let subject = "Channel check error".to_string();
                     let body = e.to_string();
                     if config.send_mail {
-                        send_mail(&config, &subject, &body, false).await?;
+                        if let Err(e) = send_mail(&config, &subject, &body, false).await {
+                            warn!("check_channels_loop: Error sending mail: {}", e);
+                        };
                     }
                     if config.send_telegram {
-                        send_telegram(&config, &subject, &body).await?;
+                        if let Err(e) = send_telegram(&config, &subject, &body).await {
+                            warn!("check_channels_loop: Error sending telegram: {}", e);
+                        };
                     }
                 }
             };

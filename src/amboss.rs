@@ -87,10 +87,14 @@ pub async fn amboss_ping_loop(plugin: Plugin<PluginState>) -> Result<(), Error> 
                         let subject = "Amboss error".to_string();
                         let body = e.to_string();
                         if config.send_mail {
-                            send_mail(&config, &subject, &body, false).await?;
+                            if let Err(e) = send_mail(&config, &subject, &body, false).await {
+                                warn!("amboss_ping_loop: Error sending mail: {}", e);
+                            };
                         }
                         if config.send_telegram {
-                            send_telegram(&config, &subject, &body).await?;
+                            if let Err(e) = send_telegram(&config, &subject, &body).await {
+                                warn!("amboss_ping_loop: Error sending telegram: {}", e);
+                            };
                         }
                         sleep_time_s += 10;
                     }
