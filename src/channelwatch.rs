@@ -71,13 +71,17 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
             continue;
         };
         if connected {
-            info!("check_channel: disconnecting from: {}", peer.to_string());
+            info!("check_channel: disconnecting from: {}", peer);
             match disconnect(&rpc_path, *peer).await {
                 Ok(_) => {
                     info!("check_channel: disconnect successful");
                 }
                 Err(de) => match de.downcast() {
-                    Ok(RpcError { code: _, message }) => {
+                    Ok(RpcError {
+                        code: _,
+                        message,
+                        data: _,
+                    }) => {
                         info!(
                             "check_channel: Could not disconnect from {}: {}",
                             peer, message
@@ -105,7 +109,11 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
                 info!("check_channel: connect successful: {}", peer);
             }
             Err(ce) => match ce.downcast() {
-                Ok(RpcError { code: _, message }) => {
+                Ok(RpcError {
+                    code: _,
+                    message,
+                    data: _,
+                }) => {
                     info!("check_channel: Could not connect to {}: {}", peer, message);
                     status.push(format!("Could not connect: {}", message));
                 }
@@ -204,8 +212,7 @@ fn check_slackers(
                             warn!(
                                 "check_channel: Found peer with error in status but not \
                                 in closing state: {} status: {}",
-                                peer_id.to_string(),
-                                status
+                                peer_id, status
                             );
                             update_slackers(
                                 peer_slackers,
@@ -221,8 +228,7 @@ fn check_slackers(
                         if status.to_lowercase().contains("update_fee") {
                             warn!(
                                 "check_channel: Can't agree on fee with: {} status: {}",
-                                peer_id.to_string(),
-                                status
+                                peer_id, status
                             );
                             update_slackers(
                                 peer_slackers,
@@ -239,7 +245,7 @@ fn check_slackers(
                         warn!(
                             "check_channel: Found disconnected peer that does not want to \
                             reconnect: {} status instead is: {}",
-                            peer_id.to_string(),
+                            peer_id,
                             statuses.join("\n")
                         );
                         update_slackers(
@@ -262,7 +268,7 @@ fn check_slackers(
                                     "check_channel: Found peer {} with channel {} with close \
                                     to expiry htlc: {} blocks",
                                     peer_id,
-                                    chan.short_channel_id.unwrap().to_string(),
+                                    chan.short_channel_id.unwrap(),
                                     expiry - current_blockheight
                                 );
                                 update_slackers(
@@ -270,7 +276,7 @@ fn check_slackers(
                                     peer_id,
                                     format!(
                                         "Found channel {} with close to expiry htlc: {} blocks",
-                                        chan.short_channel_id.unwrap().to_string(),
+                                        chan.short_channel_id.unwrap(),
                                         expiry - current_blockheight
                                     ),
                                 );
@@ -292,15 +298,15 @@ fn check_slackers(
                                 warn!(
                                     "check_channel: Found connected peer {} with channel {} \
                                     with one-sided gossip",
-                                    peer_id.to_string(),
-                                    chan.short_channel_id.unwrap().to_string()
+                                    peer_id,
+                                    chan.short_channel_id.unwrap()
                                 );
                                 update_slackers(
                                     peer_slackers,
                                     peer_id,
                                     format!(
                                         "Found connected channel {} with one-sided gossip",
-                                        chan.short_channel_id.unwrap().to_string()
+                                        chan.short_channel_id.unwrap()
                                     ),
                                 );
                             } else {
@@ -309,15 +315,15 @@ fn check_slackers(
                                         warn!(
                                         "check_channel: Found connected peer {} with channel {} \
                                         with inactive gossip",
-                                        peer_id.to_string(),
-                                        chan.short_channel_id.unwrap().to_string()
+                                        peer_id,
+                                        chan.short_channel_id.unwrap()
                                     );
                                         update_slackers(
                                             peer_slackers,
                                             peer_id,
                                             format!(
                                                 "Found connected channel {} with inactive gossip",
-                                                chan.short_channel_id.unwrap().to_string()
+                                                chan.short_channel_id.unwrap()
                                             ),
                                         );
                                     }
@@ -325,15 +331,15 @@ fn check_slackers(
                                         warn!(
                                             "check_channel: Found public peer {} with channel {} \
                                         with non-public gossip",
-                                            peer_id.to_string(),
-                                            chan.short_channel_id.unwrap().to_string()
+                                            peer_id,
+                                            chan.short_channel_id.unwrap()
                                         );
                                         update_slackers(
                                             peer_slackers,
                                             peer_id,
                                             format!(
                                                 "Found public channel {} with non-public gossip",
-                                                chan.short_channel_id.unwrap().to_string()
+                                                chan.short_channel_id.unwrap()
                                             ),
                                         );
                                     }
@@ -343,14 +349,14 @@ fn check_slackers(
                             warn!(
                                 "check_channel: Found peer {} with channel {} with no gossip",
                                 peer_id,
-                                chan.short_channel_id.unwrap().to_string()
+                                chan.short_channel_id.unwrap()
                             );
                             update_slackers(
                                 peer_slackers,
                                 peer_id,
                                 format!(
                                     "Found channel {} with no gossip",
-                                    chan.short_channel_id.unwrap().to_string()
+                                    chan.short_channel_id.unwrap()
                                 ),
                             );
                         }
