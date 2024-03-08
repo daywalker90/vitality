@@ -237,6 +237,11 @@ fn check_slackers(
                             );
                             specific_error_found = true;
                         }
+                        if status.to_lowercase().contains("htlc") {
+                            warn!("check_channel: {} status: {}", peer_id, status);
+                            update_slackers(peer_slackers, peer_id, format!("Status: {}", status));
+                            specific_error_found = true;
+                        }
                         if status.to_lowercase().contains("will attempt reconnect") {
                             contained_reconnect = true;
                         }
