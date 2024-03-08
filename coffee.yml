@@ -1,0 +1,9 @@
+plugin:
+  name: vitality
+  version: 0.1.6
+  lang: rust
+  install: |
+    cargo build --release && cp target/release/vitality . && cargo clean
+  main: vitality
+tipping:
+  bolt12: lno1pgy8v6t5v9kxjarezg9kgctewaskc6m9wgunq93pqwqw7qsflud5dsu2xlx5pasn68dw86aysx5sj3vads2rfg89dewcc
