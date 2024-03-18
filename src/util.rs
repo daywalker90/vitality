@@ -106,20 +106,3 @@ pub async fn send_telegram(config: &Config, subject: &String, body: &String) -> 
 pub fn make_rpc_path(plugin: &Plugin<PluginState>) -> PathBuf {
     Path::new(&plugin.configuration().lightning_dir).join(plugin.configuration().rpc_file)
 }
-
-pub async fn get_config_path(lightning_dir: String) -> Result<Vec<String>, Error> {
-    let lightning_dir_network = Path::new(&lightning_dir);
-    let lightning_dir_general = Path::new(&lightning_dir).parent().unwrap();
-    Ok(vec![
-        lightning_dir_general
-            .join("config")
-            .to_str()
-            .unwrap()
-            .to_string(),
-        lightning_dir_network
-            .join("config")
-            .to_str()
-            .unwrap()
-            .to_string(),
-    ])
-}

@@ -35,9 +35,9 @@ After that the binary will be here: ``target/release/vitality``
 ### Usage
 You can configure what the plugin checks for and optionally get notified with the options below.
 
-These have to be in the ``config`` file in your ``lightning-dir`` (usually ``~/.lightning/config`` or ``~/.lightning/<network>/config``). The plugin is unable to read configs somewhere else, e.g. ``/etc/lightningd/config`` or from the cli.
+These have to be in the ``config`` file in your ``lightning-dir`` (usually ``~/.lightning/config`` or ``~/.lightning/<network>/config``). The plugin is unable to read configs somewhere else, e.g. ``/etc/lightningd/config`` or from the cli. If you specified a different config file for cln with ``--conf``, you still need to put the vitality options in a file called ``config`` in the ``lightning-dir`` mentioned before.
 
-:warning: Make sure the plugin starts with lightningd (either by setting plugin=/path/to/vitality or putting it/link it in the plugins folder). Otherwise you have to comment out the vitality- lines or lightningd will not start
+:warning: Make sure the plugin starts with lightningd (either by setting ``plugin=/path/to/vitality`` or putting it/link it in the plugins folder). Otherwise you have to comment out the ``vitality-`` lines or lightningd will not start
 
 The channel health checks happen 10 minutes after start of the plugin and then every hour, so we don't disconnect from peers more than once an hour.
 

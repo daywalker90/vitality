@@ -1,47 +1,48 @@
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use anyhow::{anyhow, Error};
 use cln_plugin::ConfiguredPlugin;
-use log::info;
+use log::{info, warn};
+use parking_lot::Mutex;
 use tokio::fs;
 
-use crate::{rpc::get_info, util::get_config_path, PluginState};
-
-// pub fn get_startup_options(
-//     plugin: &ConfiguredPlugin<PluginState, tokio::io::Stdin, tokio::io::Stdout>,
-//     state: PluginState,
-// ) -> Result<(), Error> {
-//     let mut config = state.config.lock();
-//     Ok(())
-// }
+use crate::{structs::Config, PluginState};
 
 pub async fn read_config(
     plugin: &ConfiguredPlugin<PluginState, tokio::io::Stdin, tokio::io::Stdout>,
     state: PluginState,
 ) -> Result<(), Error> {
-    let mut config_file_content = String::new();
     let dir = plugin.configuration().lightning_dir;
-    let rpc_path = Path::new(&dir).join(plugin.configuration().rpc_file);
-    let getinfo = get_info(&rpc_path).await?;
-    let config_file_path = get_config_path(getinfo.lightning_dir).await?;
-
-    for confs in config_file_path {
-        match fs::read_to_string(Path::new(&confs)).await {
-            Ok(f) => {
-                info!("Found config file: {}", confs);
-                config_file_content += &(f + "\n")
+    let general_configfile =
+        match fs::read_to_string(Path::new(&dir).parent().unwrap().join("config")).await {
+            Ok(file2) => file2,
+            Err(_) => {
+                warn!("No general config file found!");
+                String::new()
             }
-            Err(e) => info!("Not a config file {}! {}", confs, e.to_string()),
+        };
+    let network_configfile = match fs::read_to_string(Path::new(&dir).join("config")).await {
+        Ok(file) => file,
+        Err(_) => {
+            warn!("No network config file found!");
+            String::new()
         }
-    }
+    };
 
-    if config_file_content.is_empty() {
+    if general_configfile.is_empty() && network_configfile.is_empty() {
         return Err(anyhow!("No config file found!"));
     }
 
-    let mut config = state.config.lock();
+    parse_config_file(general_configfile, state.config.clone())?;
+    parse_config_file(network_configfile, state.config.clone())?;
 
-    for line in config_file_content.lines() {
+    Ok(())
+}
+
+fn parse_config_file(configfile: String, config: Arc<Mutex<Config>>) -> Result<(), Error> {
+    let mut config = config.lock();
+
+    for line in configfile.lines() {
         if line.contains('=') {
             let splitline = line.split('=').collect::<Vec<&str>>();
             if splitline.len() == 2 {

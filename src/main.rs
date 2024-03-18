@@ -76,12 +76,6 @@ async fn main() -> Result<(), anyhow::Error> {
         .await?
     {
         Some(plugin) => {
-            // debug!("read startup options done");
-            // match get_startup_options(&plugin, state.clone()) {
-            //     Ok(()) => &(),
-            //     Err(e) => return plugin.disable(format!("{}", e).as_str()).await,
-            // };
-
             debug!("read config");
             match read_config(&plugin, state.clone()).await {
                 Ok(()) => &(),
