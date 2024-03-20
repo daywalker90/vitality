@@ -49,7 +49,7 @@ const OPT_EMAIL_TO: StringConfigOption =
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    std::env::set_var("CLN_PLUGIN_LOG", "cln_plugin=info,cln_rpc=info,debug");
+    std::env::set_var("CLN_PLUGIN_LOG", "vitality=debug,info");
     log_panics::init();
     let state = PluginState::new();
     // let defaultconfig = Config::new();
