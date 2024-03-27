@@ -36,7 +36,6 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
     let get_info = get_info(&rpc_path).await?;
 
     let current_blockheight = get_info.blockheight;
-    let network = get_info.network;
 
     let list_nodes = list_nodes(&rpc_path, None).await?.nodes;
     let alias_map = list_nodes
@@ -45,7 +44,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         .collect::<HashMap<PublicKey, String>>();
 
     let gossip = if config.watch_gossip.1 {
-        Some(get_gossip_map(&rpc_path).await?)
+        Some(get_gossip_map(&rpc_path, get_info.id).await?)
     } else {
         None
     };
@@ -56,7 +55,6 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         &config,
         &mut peer_slackers,
         current_blockheight,
-        &network,
         &gossip,
     );
 
@@ -134,7 +132,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         .channels
         .ok_or(anyhow!("No channels found"))?;
     let gossip = if config.watch_gossip.1 {
-        Some(get_gossip_map(&rpc_path).await?)
+        Some(get_gossip_map(&rpc_path, get_info.id).await?)
     } else {
         None
     };
@@ -145,7 +143,6 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         &config,
         &mut peer_slackers,
         current_blockheight,
-        &network,
         &gossip,
     );
 
@@ -188,7 +185,6 @@ fn check_slackers(
     config: &Config,
     peer_slackers: &mut HashMap<PublicKey, Vec<String>>,
     current_blockheight: u32,
-    network: &String,
     gossip: &Option<HashMap<ShortChannelId, Vec<ListchannelsChannels>>>,
 ) {
     for chan in channels {
@@ -291,68 +287,26 @@ fn check_slackers(
                 }
                 if let Some(goss) = &gossip {
                     let public = !chan.private.unwrap();
-                    if connected
-                        && (goss.len() > 40_000 && network == "bitcoin"
-                            || goss.len() > 2_000 && network == "testnet"
-                            || network == "regtest")
+                    if !connected {
+                        continue;
+                    }
+                    if goss.len()
+                        < channels
+                            .iter()
+                            .filter(|s| s.private.is_some() && !s.private.unwrap())
+                            .count()
+                            / 2
                     {
-                        let chan_goss = goss.get(&chan.short_channel_id.unwrap());
+                        warn!("check_channel: gossip_store still too empty...");
+                        continue;
+                    }
+                    let chan_goss = goss.get(&chan.short_channel_id.unwrap());
 
-                        if let Some(chan_gossip) = chan_goss {
-                            if chan_gossip.len() == 1 {
-                                warn!(
-                                    "check_channel: Found connected peer {} with channel {} \
-                                    with one-sided gossip",
-                                    peer_id,
-                                    chan.short_channel_id.unwrap()
-                                );
-                                update_slackers(
-                                    peer_slackers,
-                                    peer_id,
-                                    format!(
-                                        "Found connected channel {} with one-sided gossip",
-                                        chan.short_channel_id.unwrap()
-                                    ),
-                                );
-                            } else {
-                                for side in chan_gossip {
-                                    if !side.active {
-                                        warn!(
-                                        "check_channel: Found connected peer {} with channel {} \
-                                        with inactive gossip",
-                                        peer_id,
-                                        chan.short_channel_id.unwrap()
-                                    );
-                                        update_slackers(
-                                            peer_slackers,
-                                            peer_id,
-                                            format!(
-                                                "Found connected channel {} with inactive gossip",
-                                                chan.short_channel_id.unwrap()
-                                            ),
-                                        );
-                                    }
-                                    if public && !side.public {
-                                        warn!(
-                                            "check_channel: Found public peer {} with channel {} \
-                                        with non-public gossip",
-                                            peer_id,
-                                            chan.short_channel_id.unwrap()
-                                        );
-                                        update_slackers(
-                                            peer_slackers,
-                                            peer_id,
-                                            format!(
-                                                "Found public channel {} with non-public gossip",
-                                                chan.short_channel_id.unwrap()
-                                            ),
-                                        );
-                                    }
-                                }
-                            }
-                        } else {
+                    if let Some(chan_gossip) = chan_goss {
+                        if chan_gossip.len() == 1 {
                             warn!(
-                                "check_channel: Found peer {} with channel {} with no gossip",
+                                "check_channel: Found connected peer {} with channel {} \
+                                    with one-sided gossip",
                                 peer_id,
                                 chan.short_channel_id.unwrap()
                             );
@@ -360,11 +314,60 @@ fn check_slackers(
                                 peer_slackers,
                                 peer_id,
                                 format!(
-                                    "Found channel {} with no gossip",
+                                    "Found connected channel {} with one-sided gossip",
                                     chan.short_channel_id.unwrap()
                                 ),
                             );
+                        } else {
+                            for side in chan_gossip {
+                                if !side.active {
+                                    warn!(
+                                        "check_channel: Found connected peer {} with channel {} \
+                                        with inactive gossip",
+                                        peer_id,
+                                        chan.short_channel_id.unwrap()
+                                    );
+                                    update_slackers(
+                                        peer_slackers,
+                                        peer_id,
+                                        format!(
+                                            "Found connected channel {} with inactive gossip",
+                                            chan.short_channel_id.unwrap()
+                                        ),
+                                    );
+                                }
+                                if public && !side.public {
+                                    warn!(
+                                        "check_channel: Found public peer {} with channel {} \
+                                        with non-public gossip",
+                                        peer_id,
+                                        chan.short_channel_id.unwrap()
+                                    );
+                                    update_slackers(
+                                        peer_slackers,
+                                        peer_id,
+                                        format!(
+                                            "Found public channel {} with non-public gossip",
+                                            chan.short_channel_id.unwrap()
+                                        ),
+                                    );
+                                }
+                            }
                         }
+                    } else {
+                        warn!(
+                            "check_channel: Found peer {} with channel {} with no gossip",
+                            peer_id,
+                            chan.short_channel_id.unwrap()
+                        );
+                        update_slackers(
+                            peer_slackers,
+                            peer_id,
+                            format!(
+                                "Found channel {} with no gossip",
+                                chan.short_channel_id.unwrap()
+                            ),
+                        );
                     }
                 }
             }
@@ -375,11 +378,25 @@ fn check_slackers(
 
 async fn get_gossip_map(
     rpc_path: &PathBuf,
+    my_pubkey: PublicKey,
 ) -> Result<HashMap<ShortChannelId, Vec<ListchannelsChannels>>, Error> {
     let now = Instant::now();
-    debug!("check_channel: getting gossip...");
+    debug!("check_channel: getting our gossip...");
     let mut map: HashMap<ShortChannelId, Vec<ListchannelsChannels>> = HashMap::new();
-    for list_channels in list_channels(rpc_path, None, None, None).await?.channels {
+    for list_channels in list_channels(rpc_path, None, Some(my_pubkey), None)
+        .await?
+        .channels
+    {
+        if let Some(existing_list) = map.get_mut(&list_channels.short_channel_id) {
+            existing_list.push(list_channels);
+        } else {
+            map.insert(list_channels.short_channel_id, vec![list_channels]);
+        }
+    }
+    for list_channels in list_channels(rpc_path, None, None, Some(my_pubkey))
+        .await?
+        .channels
+    {
         if let Some(existing_list) = map.get_mut(&list_channels.short_channel_id) {
             existing_list.push(list_channels);
         } else {
@@ -387,7 +404,7 @@ async fn get_gossip_map(
         }
     }
     debug!(
-        "check_channel: got gossip in {}ms, gossip size: {}",
+        "check_channel: got our gossip in {}ms, gossip size: {}",
         now.elapsed().as_millis(),
         map.len()
     );
