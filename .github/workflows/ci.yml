@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: Test PY=${{ matrix.python-version }}, BCD=${{ matrix.bitcoind-version }}, EXP=${{ matrix.experimental }}, DEP=${{ matrix.deprecated }}
+    name: Test CLN=${{ matrix.lightning-version.cln }} PY=${{ matrix.python-version }}, BCD=${{ matrix.bitcoind-version }}, EXP=${{ matrix.experimental }}, DEP=${{ matrix.deprecated }}
     strategy:
         fail-fast: false
         matrix:
@@ -22,11 +22,7 @@ jobs:
             experimental: [1]
             deprecated: [0]
             python-version: ["3.8", "3.12"]
-            include:
-                - cln-version: "v23.11.2"
-                  pyln-testing-version: "23.11"
-                - cln-version: "v24.02.1"
-                  pyln-testing-version: "24.02"
+            lightning-version: [{cln: "v23.11.2", pyln: "23.11"}, {cln: "v24.02.1", pyln: "24.02"}]
     
     runs-on: ubuntu-latest
     
@@ -42,9 +38,9 @@ jobs:
         sudo mv bitcoin-${BITCOIND_VERSION}/bin/* /usr/local/bin
         rm -rf bitcoin-${BITCOIND_VERSION}-x86_64-linux-gnu.tar.gz bitcoin-${BITCOIND_VERSION}
       
-    - name: Download Core Lightning ${{ matrix.cln-version }} & install binaries
+    - name: Download Core Lightning ${{ matrix.lightning-version.cln }} & install binaries
       run: |
-          url=$(curl -s https://api.github.com/repos/ElementsProject/lightning/releases/tags/${{ matrix.cln-version }} \
+          url=$(curl -s https://api.github.com/repos/ElementsProject/lightning/releases/tags/${{ matrix.lightning-version.cln }} \
             | jq '.assets[] | select(.name | contains("22.04")) | .browser_download_url' \
             | tr -d '\"')
           wget $url
@@ -68,6 +64,6 @@ jobs:
         cd tests
         ./setup.sh
         cd ..
-        pip3 install --user pyln-testing==${{ matrix.pyln-testing-version }}
+        pip3 install --user pyln-testing==${{ matrix.lightning-version.pyln }}
         pip3 install --user pytest-xdist
         pytest -n=5 tests/test_vitality.py
