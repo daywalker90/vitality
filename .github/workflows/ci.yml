@@ -14,12 +14,14 @@ on:
 
 jobs:
   build:
+    name: Test PY=${{ matrix.python-version }}, BCD=${{ matrix.bitcoind-version }}, EXP=${{ matrix.experimental }}, DEP=${{ matrix.deprecated }}
     strategy:
         fail-fast: false
         matrix:
             bitcoind-version: ["26.0"]
             experimental: [1]
             deprecated: [0]
+            python-version: ["3.8", "3.12"]
             include:
                 - cln-version: "v23.11.2"
                   pyln-testing-version: "23.11"
@@ -49,6 +51,11 @@ jobs:
           sudo tar -xvf ${url##*/} -C /usr/local --strip-components=2
           echo "CLN_VERSION=$(lightningd --version)" >> "$GITHUB_OUTPUT"
         
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
     - name: Run tests
       run: |
         export CLN_PATH=${{ github.workspace }}/lightning
