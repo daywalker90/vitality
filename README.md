@@ -1,4 +1,4 @@
-# vitality
+# vitality ![ci status badge v24.02](https://github.com/daywalker90/vitality/actions/workflows/v24.02.yml/badge.svg?event=push) ![ci status badge v23.11](https://github.com/daywalker90/vitality/actions/workflows/v23.11.yml/badge.svg?event=push)
 Core lightning (CLN) plugin to watch channel health, gossip health and ping amboss for online status
 
 * [Installation](#installation)
