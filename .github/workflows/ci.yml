@@ -67,6 +67,6 @@ jobs:
         export VALGRIND=0
         cd tests
         ./setup.sh
-        pip3 install --user pyln-testing=${{ matrix.pyln-testing-version }}
+        pip3 install --user pyln-testing==${{ matrix.pyln-testing-version }}
         pip3 install --user pytest-xdist
         pytest -n=5 test_vitality.py
