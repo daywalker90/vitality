@@ -44,7 +44,7 @@ jobs:
       
     - name: Download Core Lightning ${{ matrix.cln-version }} & install binaries
       run: |
-          url=$(curl -s https://api.github.com/repos/ElementsProject/lightning/releases/tag/${{ matrix.cln-version }} \
+          url=$(curl -s https://api.github.com/repos/ElementsProject/lightning/releases/tags/${{ matrix.cln-version }} \
             | jq '.assets[] | select(.name | contains("22.04")) | .browser_download_url' \
             | tr -d '\"')
           wget $url
