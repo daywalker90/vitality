@@ -6,15 +6,18 @@ concurrency:
     cancel-in-progress: true
 
 on:
-    push:
-        branches:
-        - main
-    pull_request:
-    workflow_dispatch:
+    workflow_call:
+        inputs:
+          cln-version:
+            required: true
+            type: string
+          pyln-version:
+            required: true
+            type: string
 
 jobs:
   build:
-    name: Test CLN=${{ matrix.lightning-version.cln }} PY=${{ matrix.python-version }}, BCD=${{ matrix.bitcoind-version }}, EXP=${{ matrix.experimental }}, DEP=${{ matrix.deprecated }}
+    name: Test CLN=${{ inputs.cln-version }} PY=${{ matrix.python-version }}, BCD=${{ matrix.bitcoind-version }}, EXP=${{ matrix.experimental }}, DEP=${{ matrix.deprecated }}
     strategy:
         fail-fast: false
         matrix:
@@ -22,7 +25,6 @@ jobs:
             experimental: [1]
             deprecated: [0]
             python-version: ["3.8", "3.12"]
-            lightning-version: [{cln: "v23.11.2", pyln: "23.11"}, {cln: "v24.02.1", pyln: "24.02"}]
     
     runs-on: ubuntu-latest
     
@@ -38,9 +40,9 @@ jobs:
         sudo mv bitcoin-${BITCOIND_VERSION}/bin/* /usr/local/bin
         rm -rf bitcoin-${BITCOIND_VERSION}-x86_64-linux-gnu.tar.gz bitcoin-${BITCOIND_VERSION}
       
-    - name: Download Core Lightning ${{ matrix.lightning-version.cln }} & install binaries
+    - name: Download Core Lightning ${{ inputs.cln-version }} & install binaries
       run: |
-          url=$(curl -s https://api.github.com/repos/ElementsProject/lightning/releases/tags/${{ matrix.lightning-version.cln }} \
+          url=$(curl -s https://api.github.com/repos/ElementsProject/lightning/releases/tags/${{ inputs.cln-version }} \
             | jq '.assets[] | select(.name | contains("22.04")) | .browser_download_url' \
             | tr -d '\"')
           wget $url
@@ -64,6 +66,6 @@ jobs:
         cd tests
         ./setup.sh
         cd ..
-        pip3 install --user pyln-proto==${{ matrix.lightning-version.pyln }} pyln-client==${{ matrix.lightning-version.pyln }} pyln-testing==${{ matrix.lightning-version.pyln }}
+        pip3 install --user pyln-proto==${{ inputs.pyln-version }} pyln-client==${{ inputs.pyln-version }} pyln-testing==${{ inputs.pyln-version }}
         pip3 install --user pytest-xdist
         pytest -n=5 tests/test_vitality.py
