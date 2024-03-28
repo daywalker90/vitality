@@ -64,6 +64,6 @@ jobs:
         cd tests
         ./setup.sh
         cd ..
-        pip3 install --user pyln-testing==${{ matrix.lightning-version.pyln }}
+        pip3 install --user pyln-proto==${{ matrix.lightning-version.pyln }} pyln-client==${{ matrix.lightning-version.pyln }} pyln-testing==${{ matrix.lightning-version.pyln }}
         pip3 install --user pytest-xdist
         pytest -n=5 tests/test_vitality.py
