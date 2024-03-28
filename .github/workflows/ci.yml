@@ -65,6 +65,7 @@ jobs:
         export TEST_DEBUG=1
         export TRAVIS=1
         export VALGRIND=0
+        ls -al
         cd tests
         ./setup.sh
         pytest -n=5 test_vitality.py
