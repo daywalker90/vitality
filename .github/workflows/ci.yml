@@ -70,7 +70,7 @@ jobs:
       if: ${{ inputs.tagged-release == false}}
       uses: arduino/setup-protoc@v3
 
-    - name: Get binary
+    - name: Get plugin binary
       run: |
         if ${{ inputs.tagged-release }}; then
           cd tests
@@ -89,4 +89,4 @@ jobs:
         export TEST_DEBUG=1
         export TRAVIS=1
         export VALGRIND=0
-        pytest -n=5 tests/test_vitality.py
+        pytest -n=5 tests/test_*.py
