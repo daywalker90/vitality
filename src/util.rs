@@ -106,3 +106,11 @@ pub async fn send_telegram(config: &Config, subject: &String, body: &String) -> 
 pub fn make_rpc_path(plugin: &Plugin<PluginState>) -> PathBuf {
     Path::new(&plugin.configuration().lightning_dir).join(plugin.configuration().rpc_file)
 }
+
+pub fn parse_boolean(s: &str) -> Option<bool> {
+    match s.to_lowercase().as_str() {
+        "true" | "1" => Some(true),
+        "false" | "0" => Some(false),
+        _ => None,
+    }
+}

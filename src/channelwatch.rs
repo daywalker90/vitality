@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{collections::HashMap, env, path::PathBuf, time::Duration};
 
 use anyhow::{anyhow, Error};
 use cln_plugin::Plugin;
@@ -16,7 +16,7 @@ use tokio::time::{self, Instant};
 use crate::{
     rpc::{connect, disconnect, get_info, list_channels, list_nodes, list_peer_channels},
     structs::{Config, PluginState},
-    util::{make_rpc_path, send_mail, send_telegram},
+    util::{make_rpc_path, parse_boolean, send_mail, send_telegram},
 };
 
 async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
@@ -424,7 +424,18 @@ fn update_slackers(
 }
 
 pub async fn check_channels_loop(plugin: Plugin<PluginState>) -> Result<(), Error> {
-    time::sleep(Duration::from_secs(600)).await;
+    let mut skip_sleep = false;
+    if let Ok(dbg) = env::var("TEST_DEBUG") {
+        if let Some(bl) = parse_boolean(&dbg) {
+            if bl {
+                skip_sleep = true
+            }
+        }
+    }
+    if !skip_sleep {
+        time::sleep(Duration::from_secs(600)).await;
+    }
+
     loop {
         {
             match check_channel(plugin.clone()).await {
