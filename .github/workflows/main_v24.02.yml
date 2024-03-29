@@ -3,7 +3,12 @@ name: main on CLN v24.02.1
 on:
     push:
         branches:
-        - main
+            - main
+        paths-ignore:
+            - 'README.md'
+            - 'LICENSE'
+            - '.gitignore'
+            - 'coffee.yml'
     pull_request:
     workflow_dispatch:
 
