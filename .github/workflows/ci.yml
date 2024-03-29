@@ -57,13 +57,28 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: rust toolchain
-      if:  ${{ inputs.tagged-release == 'false'}}
+    - name: Install Python dependencies
+      run: |
+        pip3 install --user pyln-proto==${{ inputs.pyln-version }} pyln-client==${{ inputs.pyln-version }} pyln-testing==${{ inputs.pyln-version }}
+        pip3 install --user pytest-xdist
+
+    - name: Set up Rust
+      if:  ${{ inputs.tagged-release == false}}
       uses: dtolnay/rust-toolchain@stable
 
-    - name: protoc
-      if: ${{ inputs.tagged-release == 'false'}}
+    - name: Set up protoc
+      if: ${{ inputs.tagged-release == false}}
       uses: arduino/setup-protoc@v3
+
+    - name: Get binary
+      run: |
+        if ${{ inputs.tagged-release }}; then
+          cd tests
+          ./setup.sh
+          cd ..
+        else
+          cargo build
+        fi
 
     - name: Run tests
       run: |
@@ -74,13 +89,4 @@ jobs:
         export TEST_DEBUG=1
         export TRAVIS=1
         export VALGRIND=0
-        if ${{ inputs.tagged-release }}; then
-          cd tests
-          ./setup.sh
-          cd ..
-        else
-          cargo build
-        fi
-        pip3 install --user pyln-proto==${{ inputs.pyln-version }} pyln-client==${{ inputs.pyln-version }} pyln-testing==${{ inputs.pyln-version }}
-        pip3 install --user pytest-xdist
         pytest -n=5 tests/test_vitality.py
