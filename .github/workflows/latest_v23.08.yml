@@ -2,8 +2,7 @@ name: latest release on CLN v23.08.1
 
 on:
     release:
-        types: 
-            - edited
+        types: [published, edited]
     workflow_dispatch:
 
 jobs:
