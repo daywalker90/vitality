@@ -4,13 +4,13 @@ use anyhow::{anyhow, Error};
 use cln_plugin::Plugin;
 
 use chrono::Utc;
+use cln_rpc::{model::requests::SignmessageRequest, ClnRpc};
 use log::{info, warn};
 use reqwest::Client;
 use serde_json::{json, Value};
 use tokio::time::{self, Instant};
 
 use crate::{
-    rpc::signmessage,
     structs::PluginState,
     util::{make_rpc_path, send_mail, send_telegram},
 };
@@ -20,12 +20,17 @@ async fn amboss_ping(plugin: Plugin<PluginState>) -> Result<(), Error> {
     info!("Creating amboss ping");
 
     let rpc_path = make_rpc_path(&plugin);
+    let mut rpc = ClnRpc::new(&rpc_path).await?;
 
     let url = "https://api.amboss.space/graphql";
     let timestamp = Utc::now().format("%Y-%m-%dT%H:%M:%S%z").to_string();
     info!("Timestamp: {}", timestamp);
 
-    let signature = signmessage(&rpc_path, timestamp.clone()).await?;
+    let signature = rpc
+        .call_typed(&SignmessageRequest {
+            message: timestamp.clone(),
+        })
+        .await?;
     info!("Signature: {}", signature.zbase);
 
     let variables = json!({

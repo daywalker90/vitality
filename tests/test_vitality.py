@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import os
 import time
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from util import get_plugin  # noqa: F401
 
 
 def test_basic(node_factory, get_plugin):  # noqa: F811
+    os.environ["TEST_DEBUG"] = "true"
     node = node_factory.get_node()
     lightning_dir = Path(node.rpc.call("getinfo")["lightning-dir"])
     config_file = lightning_dir / "config"

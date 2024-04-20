@@ -1,20 +1,25 @@
-use std::{collections::HashMap, env, path::PathBuf, time::Duration};
+use std::{collections::HashMap, env, time::Duration};
 
 use anyhow::{anyhow, Error};
 use cln_plugin::Plugin;
 
 use cln_rpc::{
-    model::responses::{
-        ListchannelsChannels, ListpeerchannelsChannels, ListpeerchannelsChannelsState,
+    model::{
+        requests::{
+            ConnectRequest, DisconnectRequest, GetinfoRequest, ListchannelsRequest,
+            ListnodesRequest, ListpeerchannelsRequest,
+        },
+        responses::{
+            ListchannelsChannels, ListpeerchannelsChannels, ListpeerchannelsChannelsState,
+        },
     },
     primitives::{PublicKey, ShortChannelId},
-    RpcError,
+    ClnRpc,
 };
 use log::{debug, info, warn};
 use tokio::time::{self, Instant};
 
 use crate::{
-    rpc::{connect, disconnect, get_info, list_channels, list_nodes, list_peer_channels},
     structs::{Config, PluginState},
     util::{make_rpc_path, parse_boolean, send_mail, send_telegram},
 };
@@ -24,8 +29,10 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
     info!("check_channel: Starting");
 
     let rpc_path = make_rpc_path(&plugin);
+    let mut rpc = ClnRpc::new(&rpc_path).await?;
 
-    let channels = list_peer_channels(&rpc_path, None)
+    let channels = rpc
+        .call_typed(&ListpeerchannelsRequest { id: None })
         .await?
         .channels
         .ok_or(anyhow!("No channels found"))?;
@@ -33,18 +40,18 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
 
     let config = plugin.state().config.lock().clone();
 
-    let get_info = get_info(&rpc_path).await?;
+    let get_info = rpc.call_typed(&GetinfoRequest {}).await?;
 
     let current_blockheight = get_info.blockheight;
 
-    let list_nodes = list_nodes(&rpc_path, None).await?.nodes;
+    let list_nodes = rpc.call_typed(&ListnodesRequest { id: None }).await?.nodes;
     let alias_map = list_nodes
         .into_iter()
         .filter_map(|a| a.alias.map(|alias| (a.nodeid, alias)))
         .collect::<HashMap<PublicKey, String>>();
 
     let gossip = if config.watch_gossip.1 {
-        Some(get_gossip_map(&rpc_path, get_info.id).await?)
+        Some(get_gossip_map(&mut rpc, get_info.id).await?)
     } else {
         None
     };
@@ -70,26 +77,23 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         };
         if connected {
             info!("check_channel: disconnecting from: {}", peer);
-            match disconnect(&rpc_path, *peer).await {
+            match rpc
+                .call_typed(&DisconnectRequest {
+                    id: *peer,
+                    force: Some(true),
+                })
+                .await
+            {
                 Ok(_) => {
                     info!("check_channel: disconnect successful");
                 }
-                Err(de) => match de.downcast() {
-                    Ok(RpcError {
-                        code: _,
-                        message,
-                        data: _,
-                    }) => {
-                        info!(
-                            "check_channel: Could not disconnect from {}: {}",
-                            peer, message
-                        );
-                        status.push(format!("Could not disconnect: {}", message));
-                    }
-                    Err(e) => {
-                        return Err(anyhow!(e));
-                    }
-                },
+                Err(de) => {
+                    info!(
+                        "check_channel: Could not disconnect from {}: {}",
+                        peer, de.message
+                    );
+                    status.push(format!("Could not disconnect: {}", de.message));
+                }
             };
         } else {
             info!("check_channel: already disconnected from: {}", peer);
@@ -102,23 +106,24 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
     }
 
     for (peer, status) in peer_slackers.iter_mut() {
-        match connect(&rpc_path, *peer, None, None).await {
+        match rpc
+            .call_typed(&ConnectRequest {
+                id: peer.to_string(),
+                host: None,
+                port: None,
+            })
+            .await
+        {
             Ok(_o) => {
                 info!("check_channel: connect successful: {}", peer);
             }
-            Err(ce) => match ce.downcast() {
-                Ok(RpcError {
-                    code: _,
-                    message,
-                    data: _,
-                }) => {
-                    info!("check_channel: Could not connect to {}: {}", peer, message);
-                    status.push(format!("Could not connect: {}", message));
-                }
-                Err(e) => {
-                    return Err(anyhow!(e));
-                }
-            },
+            Err(ce) => {
+                info!(
+                    "check_channel: Could not connect to {}: {}",
+                    peer, ce.message
+                );
+                status.push(format!("Could not connect: {}", ce.message));
+            }
         }
     }
 
@@ -127,12 +132,13 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         time::sleep(Duration::from_secs(30)).await;
     }
 
-    let channels = list_peer_channels(&rpc_path, None)
+    let channels = rpc
+        .call_typed(&ListpeerchannelsRequest { id: None })
         .await?
         .channels
         .ok_or(anyhow!("No channels found"))?;
     let gossip = if config.watch_gossip.1 {
-        Some(get_gossip_map(&rpc_path, get_info.id).await?)
+        Some(get_gossip_map(&mut rpc, get_info.id).await?)
     } else {
         None
     };
@@ -377,13 +383,18 @@ fn check_slackers(
 }
 
 async fn get_gossip_map(
-    rpc_path: &PathBuf,
+    rpc: &mut ClnRpc,
     my_pubkey: PublicKey,
 ) -> Result<HashMap<ShortChannelId, Vec<ListchannelsChannels>>, Error> {
     let now = Instant::now();
     debug!("check_channel: getting our gossip...");
     let mut map: HashMap<ShortChannelId, Vec<ListchannelsChannels>> = HashMap::new();
-    for list_channels in list_channels(rpc_path, None, Some(my_pubkey), None)
+    for list_channels in rpc
+        .call_typed(&ListchannelsRequest {
+            short_channel_id: None,
+            source: Some(my_pubkey),
+            destination: None,
+        })
         .await?
         .channels
     {
@@ -393,7 +404,12 @@ async fn get_gossip_map(
             map.insert(list_channels.short_channel_id, vec![list_channels]);
         }
     }
-    for list_channels in list_channels(rpc_path, None, None, Some(my_pubkey))
+    for list_channels in rpc
+        .call_typed(&ListchannelsRequest {
+            short_channel_id: None,
+            source: None,
+            destination: Some(my_pubkey),
+        })
         .await?
         .channels
     {
