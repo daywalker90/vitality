@@ -1,3 +1,4 @@
+use serde_json::json;
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
 
@@ -14,16 +15,14 @@ use anyhow::anyhow;
 use cln_plugin::options::{
     BooleanConfigOption, ConfigOption, IntegerConfigOption, StringConfigOption,
 };
-use cln_plugin::Builder;
+use cln_plugin::{Builder, Error, Plugin};
 
 use log::{debug, info, warn};
-use rpc::test_notifications;
 use structs::{PluginState, PLUGIN_NAME};
 
 mod amboss;
 mod channelwatch;
 mod config;
-mod rpc;
 mod structs;
 mod util;
 
@@ -164,4 +163,20 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         Err(anyhow!("Error starting the plugin!"))
     }
+}
+
+async fn test_notifications(
+    plugin: Plugin<PluginState>,
+    _args: serde_json::Value,
+) -> Result<serde_json::Value, Error> {
+    let config = plugin.state().config.lock().clone();
+    let subject = "Test Notification".to_string();
+    let body = "This is a test notification sent from vitality".to_string();
+    if config.send_mail {
+        send_mail(&config, &subject, &body, false).await?;
+    }
+    if config.send_telegram {
+        send_telegram(&config, &subject, &body).await?;
+    }
+    Ok(json!({"format-hint":"simple","result":"success"}))
 }
