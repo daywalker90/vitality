@@ -4,20 +4,30 @@ import time
 from pathlib import Path
 
 from pyln.testing.fixtures import *  # noqa: F403
+from pyln.testing.utils import sync_blockheight, wait_for
 from util import get_plugin  # noqa: F401
 
 
 def test_basic(node_factory, bitcoind, get_plugin):  # noqa: F811
     os.environ["TEST_DEBUG"] = "true"
     l1, l2 = node_factory.get_nodes(2)
-    l1.rpc.connect(l2.info["id"], "localhost", l2.port)
-    cl1, _ = l1.fundchannel(l2, 1_000_000)
-    cl2, _ = l1.fundchannel(l2, 1_000_000)
-
+    l2.fundwallet(10_000_000)
+    l2.rpc.fundchannel(
+        l1.info["id"] + "@localhost:" + str(l1.port),
+        1_000_000,
+        mindepth=1,
+        announce=True,
+    )
     bitcoind.generate_block(6)
+    sync_blockheight(bitcoind, [l1, l2])
 
-    l1.wait_channel_active(cl1)
-    l1.wait_channel_active(cl2)
+    wait_for(
+        lambda: len(l1.rpc.listpeerchannels(l2.info["id"])["channels"]) > 0
+    )
+    scid = l1.rpc.listpeerchannels(l2.info["id"])["channels"][0][
+        "short_channel_id"
+    ]
+    wait_for(lambda: len(l1.rpc.listchannels(str(scid))["channels"]) == 2)
 
     lightning_dir = Path(l1.rpc.call("getinfo")["lightning-dir"])
     config_file = lightning_dir / "config"
