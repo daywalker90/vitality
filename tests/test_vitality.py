@@ -1,6 +1,5 @@
 #!/usr/bin/python
 import os
-import time
 from pathlib import Path
 
 from pyln.testing.fixtures import *  # noqa: F403
@@ -51,5 +50,4 @@ def test_basic(node_factory, bitcoind, get_plugin):  # noqa: F811
 
     l1.rpc.call("plugin", {"subcommand": "start", "plugin": str(get_plugin)})
     l1.daemon.wait_for_log(r"Error in amboss_ping")
-    time.sleep(5)
-    assert l1.daemon.is_in_log(r"check_channel: All good.")
+    wait_for(lambda: l1.daemon.is_in_log(r"check_channel: All good."))
