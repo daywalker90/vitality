@@ -27,6 +27,18 @@ def test_basic(node_factory, bitcoind, get_plugin):  # noqa: F811
         "short_channel_id"
     ]
     wait_for(lambda: len(l1.rpc.listchannels(str(scid))["channels"]) == 2)
+    wait_for(
+        lambda: all(
+            chan["public"]
+            for chan in l1.rpc.listchannels(str(scid))["channels"]
+        )
+    )
+    wait_for(
+        lambda: all(
+            chan["active"]
+            for chan in l1.rpc.listchannels(str(scid))["channels"]
+        )
+    )
 
     lightning_dir = Path(l1.rpc.call("getinfo")["lightning-dir"])
     config_file = lightning_dir / "config"
