@@ -7,10 +7,19 @@ from pyln.testing.fixtures import *  # noqa: F403
 from util import get_plugin  # noqa: F401
 
 
-def test_basic(node_factory, get_plugin):  # noqa: F811
+def test_basic(node_factory, bitcoind, get_plugin):  # noqa: F811
     os.environ["TEST_DEBUG"] = "true"
-    node = node_factory.get_node()
-    lightning_dir = Path(node.rpc.call("getinfo")["lightning-dir"])
+    l1, l2 = node_factory.get_nodes(2)
+    l1.rpc.connect(l2.info["id"], "localhost", l2.port)
+    cl1, _ = l1.fundchannel(l2, 1_000_000)
+    cl2, _ = l1.fundchannel(l2, 1_000_000)
+
+    bitcoind.generate_block(6)
+
+    l1.wait_channel_active(cl1)
+    l1.wait_channel_active(cl2)
+
+    lightning_dir = Path(l1.rpc.call("getinfo")["lightning-dir"])
     config_file = lightning_dir / "config"
     option_lines = [
         "vitality-amboss=true\n",
@@ -30,7 +39,7 @@ def test_basic(node_factory, get_plugin):  # noqa: F811
     with config_file.open(mode="a") as file:
         file.writelines(option_lines)
 
-    node.rpc.call("plugin", {"subcommand": "start", "plugin": str(get_plugin)})
-    node.daemon.wait_for_log(r"Error in amboss_ping")
+    l1.rpc.call("plugin", {"subcommand": "start", "plugin": str(get_plugin)})
+    l1.daemon.wait_for_log(r"Error in amboss_ping")
     time.sleep(5)
-    assert node.daemon.is_in_log(r"check_channel: All good.")
+    assert l1.daemon.is_in_log(r"check_channel: All good.")
