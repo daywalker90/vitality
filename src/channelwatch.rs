@@ -248,6 +248,23 @@ fn check_slackers(
                             contained_reconnect = true;
                         }
                     }
+                    if let Some(lost_state) = chan.lost_state {
+                        if lost_state {
+                            warn!(
+                                "check_channel: Lost state with: {} status: \
+                                we are fallen behind i.e. lost some channel state",
+                                peer_id
+                            );
+                            update_slackers(
+                                peer_slackers,
+                                peer_id,
+                                ("Lost state. Status: we are fallen behind \
+                                i.e. lost some channel state")
+                                    .to_string(),
+                            );
+                            specific_error_found = true;
+                        }
+                    }
                     if !connected && !contained_reconnect && !specific_error_found {
                         warn!(
                             "check_channel: Found disconnected peer that does not want to \
