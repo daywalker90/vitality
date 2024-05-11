@@ -50,7 +50,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         .filter_map(|a| a.alias.map(|alias| (a.nodeid, alias)))
         .collect::<HashMap<PublicKey, String>>();
 
-    let gossip = if config.watch_gossip.1 {
+    let gossip = if config.watch_gossip.value {
         Some(get_gossip_map(&mut rpc, get_info.id).await?)
     } else {
         None
@@ -137,7 +137,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         .await?
         .channels
         .ok_or(anyhow!("No channels found"))?;
-    let gossip = if config.watch_gossip.1 {
+    let gossip = if config.watch_gossip.value {
         Some(get_gossip_map(&mut rpc, get_info.id).await?)
     } else {
         None
@@ -205,7 +205,7 @@ fn check_slackers(
             | ListpeerchannelsChannelsState::CHANNELD_AWAITING_SPLICE => {
                 let connected = chan.peer_connected.unwrap();
                 let peer_id = chan.peer_id.unwrap();
-                if config.watch_channels.1 {
+                if config.watch_channels.value {
                     let statuses = chan.status.as_ref().unwrap();
                     let mut contained_reconnect = false;
                     let mut specific_error_found = false;
@@ -283,11 +283,11 @@ fn check_slackers(
                         );
                     }
                 }
-                if config.expiring_htlcs.1 > 0 {
+                if config.expiring_htlcs.value > 0 {
                     let htlcs = chan.htlcs.as_ref().unwrap();
                     for htlc in htlcs {
                         if let Some(expiry) = htlc.expiry {
-                            if expiry - current_blockheight < config.expiring_htlcs.1 {
+                            if expiry - current_blockheight < config.expiring_htlcs.value {
                                 warn!(
                                     "check_channel: Found peer {} with channel {} with close \
                                     to expiry htlc: {} blocks",

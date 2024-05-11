@@ -52,26 +52,26 @@ pub async fn send_mail(
     };
 
     let email = Message::builder()
-        .from(config.email_from.1.parse().unwrap())
-        .to(config.email_to.1.parse().unwrap())
+        .from(config.email_from.value.parse().unwrap())
+        .to(config.email_to.value.parse().unwrap())
         .subject(subject.clone())
         .header(header)
         .body(body.to_string())
         .unwrap();
 
     let creds = Credentials::new(
-        config.smtp_username.1.clone(),
-        config.smtp_password.1.clone(),
+        config.smtp_username.value.clone(),
+        config.smtp_password.value.clone(),
     );
 
-    let tls_parameters = TlsParameters::builder(config.smtp_server.1.clone())
+    let tls_parameters = TlsParameters::builder(config.smtp_server.value.clone())
         .dangerous_accept_invalid_certs(false)
         .build_rustls()?;
 
-    let mailer = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.smtp_server.1)?
+    let mailer = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.smtp_server.value)?
         .credentials(creds)
         .tls(Tls::Required(tls_parameters))
-        .port(config.smtp_port.1)
+        .port(config.smtp_port.value)
         .timeout(Some(Duration::from_secs(60)))
         .build();
 
@@ -80,7 +80,7 @@ pub async fn send_mail(
     if result.is_ok() {
         info!(
             "Sent email with subject: `{}` to: `{}`",
-            subject, config.email_to.1
+            subject, config.email_to.value
         );
         Ok(())
     } else {
@@ -89,9 +89,9 @@ pub async fn send_mail(
 }
 
 pub async fn send_telegram(config: &Config, subject: &String, body: &String) -> Result<(), Error> {
-    let bot = Bot::new(config.telegram_token.1.clone());
+    let bot = Bot::new(config.telegram_token.value.clone());
 
-    for username in &config.telegram_usernames.1 {
+    for username in &config.telegram_usernames.value {
         let mut message = format!("{}\n{}", subject, body);
         if message.len() > 4000 {
             message = message[..4000].to_string()

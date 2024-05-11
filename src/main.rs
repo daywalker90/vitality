@@ -1,3 +1,4 @@
+use config::setconfig_callback;
 use serde_json::json;
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
@@ -8,7 +9,7 @@ static GLOBAL: Jemalloc = Jemalloc;
 
 extern crate serde_json;
 
-use crate::config::read_config;
+use crate::config::get_startup_options;
 use crate::util::{send_mail, send_telegram};
 
 use anyhow::anyhow;
@@ -17,7 +18,7 @@ use cln_plugin::options::{
 };
 use cln_plugin::{Builder, Error, Plugin};
 
-use log::{debug, info, warn};
+use log::{info, warn};
 use structs::{PluginState, PLUGIN_NAME};
 
 mod amboss;
@@ -26,52 +27,67 @@ mod config;
 mod structs;
 mod util;
 
-const OPT_AMBOSS: BooleanConfigOption =
-    ConfigOption::new_bool_no_default("vitality-amboss", "Switch on/off amboss");
-const OPT_EXPIRING_HTLCS: IntegerConfigOption = ConfigOption::new_i64_no_default(
-    "vitality-expiring-htlcs",
-    "Set block amount to watch for expiry",
-);
-const OPT_WATCH_CHANNELS: BooleanConfigOption =
-    ConfigOption::new_bool_no_default("vitality-watch-channels", "Switch on/off watch_channels");
-const OPT_WATCH_GOSSIP: BooleanConfigOption =
-    ConfigOption::new_bool_no_default("vitality-watch-gossip", "Switch on/off watch_gossip");
-const OPT_TELEGRAM_TOKEN: StringConfigOption =
-    ConfigOption::new_str_no_default("vitality-telegram-token", "Set telegram token");
-const OPT_TELEGRAM_USERNAMES: StringConfigOption =
-    ConfigOption::new_str_no_default("vitality-telegram-usernames", "Set telegram users");
-const OPT_SMTP_USERNAME: StringConfigOption =
-    ConfigOption::new_str_no_default("vitality-smtp-username", "Set smtp username");
-const OPT_SMTP_PASSWORD: StringConfigOption =
-    ConfigOption::new_str_no_default("vitality-smtp-password", "Set smtp password");
-const OPT_SMTP_SERVER: StringConfigOption =
-    ConfigOption::new_str_no_default("vitality-smtp-server", "Set smtp server");
-const OPT_SMTP_PORT: IntegerConfigOption =
-    ConfigOption::new_i64_no_default("vitality-smtp-port", "Set smtp port");
-const OPT_EMAIL_FROM: StringConfigOption =
-    ConfigOption::new_str_no_default("vitality-email-from", "Set email_from");
-const OPT_EMAIL_TO: StringConfigOption =
-    ConfigOption::new_str_no_default("vitality-email-to", "Set email_to");
+const OPT_AMBOSS: &str = "vitality-amboss";
+const OPT_EXPIRING_HTLCS: &str = "vitality-expiring-htlcs";
+const OPT_WATCH_CHANNELS: &str = "vitality-watch-channels";
+const OPT_WATCH_GOSSIP: &str = "vitality-watch-gossip";
+const OPT_TELEGRAM_TOKEN: &str = "vitality-telegram-token";
+const OPT_TELEGRAM_USERNAMES: &str = "vitality-telegram-usernames";
+const OPT_SMTP_USERNAME: &str = "vitality-smtp-username";
+const OPT_SMTP_PASSWORD: &str = "vitality-smtp-password";
+const OPT_SMTP_SERVER: &str = "vitality-smtp-server";
+const OPT_SMTP_PORT: &str = "vitality-smtp-port";
+const OPT_EMAIL_FROM: &str = "vitality-email-from";
+const OPT_EMAIL_TO: &str = "vitality-email-to";
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     std::env::set_var("CLN_PLUGIN_LOG", "vitality=debug,info");
     log_panics::init();
     let state = PluginState::new();
-    // let defaultconfig = Config::new();
+    let opt_amboss: BooleanConfigOption =
+        ConfigOption::new_bool_no_default(OPT_AMBOSS, "Switch on/off amboss").dynamic();
+    let opt_expiring_htlcs: IntegerConfigOption = ConfigOption::new_i64_no_default(
+        OPT_EXPIRING_HTLCS,
+        "Set block amount to watch for expiry",
+    )
+    .dynamic();
+    let opt_watch_channels: BooleanConfigOption =
+        ConfigOption::new_bool_no_default(OPT_WATCH_CHANNELS, "Switch on/off watch_channels")
+            .dynamic();
+    let opt_watch_gossip: BooleanConfigOption =
+        ConfigOption::new_bool_no_default(OPT_WATCH_GOSSIP, "Switch on/off watch_gossip").dynamic();
+    let opt_telegram_token: StringConfigOption =
+        ConfigOption::new_str_no_default(OPT_TELEGRAM_TOKEN, "Set telegram token").dynamic();
+    let opt_telegram_usernames: StringConfigOption =
+        ConfigOption::new_str_no_default(OPT_TELEGRAM_USERNAMES, "Set telegram users").dynamic();
+    let opt_smtp_username: StringConfigOption =
+        ConfigOption::new_str_no_default(OPT_SMTP_USERNAME, "Set smtp username").dynamic();
+    let opt_smtp_password: StringConfigOption =
+        ConfigOption::new_str_no_default(OPT_SMTP_PASSWORD, "Set smtp password").dynamic();
+    let opt_smtp_server: StringConfigOption =
+        ConfigOption::new_str_no_default(OPT_SMTP_SERVER, "Set smtp server").dynamic();
+    let opt_smtp_port: IntegerConfigOption =
+        ConfigOption::new_i64_no_default(OPT_SMTP_PORT, "Set smtp port").dynamic();
+    let opt_email_from: StringConfigOption =
+        ConfigOption::new_str_no_default(OPT_EMAIL_FROM, "Set email_from").dynamic();
+    let opt_email_to: StringConfigOption =
+        ConfigOption::new_str_no_default(OPT_EMAIL_TO, "Set email_to");
+
     let confplugin = match Builder::new(tokio::io::stdin(), tokio::io::stdout())
-        .option(OPT_AMBOSS)
-        .option(OPT_EXPIRING_HTLCS)
-        .option(OPT_WATCH_CHANNELS)
-        .option(OPT_WATCH_GOSSIP)
-        .option(OPT_TELEGRAM_TOKEN)
-        .option(OPT_TELEGRAM_USERNAMES)
-        .option(OPT_SMTP_USERNAME)
-        .option(OPT_SMTP_PASSWORD)
-        .option(OPT_SMTP_SERVER)
-        .option(OPT_SMTP_PORT)
-        .option(OPT_EMAIL_FROM)
-        .option(OPT_EMAIL_TO)
+        .option(opt_amboss)
+        .option(opt_expiring_htlcs)
+        .option(opt_watch_channels)
+        .option(opt_watch_gossip)
+        .option(opt_telegram_token)
+        .option(opt_telegram_usernames)
+        .option(opt_smtp_username)
+        .option(opt_smtp_password)
+        .option(opt_smtp_server)
+        .option(opt_smtp_port)
+        .option(opt_email_from)
+        .option(opt_email_to)
+        .setconfig_callback(setconfig_callback)
         .rpcmethod(
             &(PLUGIN_NAME.to_string() + "-testnotifications"),
             "test notifications settings",
@@ -82,11 +98,16 @@ async fn main() -> Result<(), anyhow::Error> {
         .await?
     {
         Some(plugin) => {
-            debug!("read config");
-            match read_config(&plugin, state.clone()).await {
+            // debug!("read config");
+            // match read_config(&plugin, state.clone()).await {
+            //     Ok(()) => &(),
+            //     Err(e) => return plugin.disable(format!("{}", e).as_str()).await,
+            // };
+            match get_startup_options(&plugin, state.clone()).await {
                 Ok(()) => &(),
                 Err(e) => return plugin.disable(format!("{}", e).as_str()).await,
             };
+            info!("read startup options");
             plugin
         }
         None => return Err(anyhow!("Error configuring the plugin!")),
@@ -94,7 +115,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if let Ok(plugin) = confplugin.start(state).await {
         let config = plugin.state().config.lock().clone();
 
-        if config.amboss.1 {
+        if config.amboss.value {
             info!("Starting amboss online ping task");
             let healthclone = plugin.clone();
             tokio::spawn(async move {
@@ -126,7 +147,7 @@ async fn main() -> Result<(), anyhow::Error> {
             });
         }
 
-        if config.expiring_htlcs.1 > 0 || config.watch_channels.1 {
+        if config.expiring_htlcs.value > 0 || config.watch_channels.value {
             let channel_clone = plugin.clone();
             tokio::spawn(async move {
                 match channelwatch::check_channels_loop(channel_clone.clone()).await {

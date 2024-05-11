@@ -1,7 +1,8 @@
 #!/usr/bin/python
 import os
-from pathlib import Path
 
+import pytest
+from pyln.client import RpcError
 from pyln.testing.fixtures import *  # noqa: F403
 from pyln.testing.utils import sync_blockheight, wait_for
 from util import get_plugin  # noqa: F401
@@ -9,7 +10,22 @@ from util import get_plugin  # noqa: F401
 
 def test_basic(node_factory, bitcoind, get_plugin):  # noqa: F811
     os.environ["TEST_DEBUG"] = "true"
-    l1, l2 = node_factory.get_nodes(2)
+    l1_opts = {
+        "plugin": get_plugin,
+        "vitality-amboss": "true",
+        "vitality-expiring-htlcs": "50",
+        "vitality-watch-channels": "true",
+        "vitality-watch-gossip": "true",
+        "vitality-telegram-token": "4582169472:Og4grGKROE3OR-x-O3kfOsks",
+        "vitality-telegram-usernames": "936723718",
+        "vitality-smtp-username": "satoshi@gmx.de",
+        "vitality-smtp-password": "WEJF§IFJseo32",
+        "vitality-smtp-server": "mail.gmx.net",
+        "vitality-smtp-port": "587",
+        "vitality-email-from": "satoshi@gmx.de",
+        "vitality-email-to": "satoshi@gmx.de",
+    }
+    l1, l2 = node_factory.get_nodes(2, opts=[l1_opts, {}])
     l2.fundwallet(10_000_000)
     l2.rpc.fundchannel(
         l1.info["id"] + "@localhost:" + str(l1.port),
@@ -40,26 +56,74 @@ def test_basic(node_factory, bitcoind, get_plugin):  # noqa: F811
         )
     )
 
-    lightning_dir = Path(l1.rpc.call("getinfo")["lightning-dir"])
-    config_file = lightning_dir / "config"
-    option_lines = [
-        "vitality-amboss=true\n",
-        "vitality-expiring-htlcs=50\n",
-        "vitality-watch-channels=true\n",
-        "vitality-watch-gossip=true\n",
-        "vitality-telegram-token=4582169472:Og4grGKROE3OR-x-O3kfOsks\n",
-        "vitality-telegram-usernames=936723718\n",
-        "vitality-smtp-username=satoshi@gmx.de\n",
-        "vitality-smtp-password=WEJF§IFJseo32\n",
-        "vitality-smtp-server=mail.gmx.net\n",
-        "vitality-smtp-port=587\n",
-        "vitality-email-from=satoshi@gmx.de\n",
-        "vitality-email-to=satoshi@gmx.de\n",
-    ]
-
-    with config_file.open(mode="a") as file:
-        file.writelines(option_lines)
-
-    l1.rpc.call("plugin", {"subcommand": "start", "plugin": str(get_plugin)})
-    l1.daemon.wait_for_log(r"Error in amboss_ping")
+    wait_for(lambda: l1.daemon.is_in_log(r"Error in amboss_ping"))
     wait_for(lambda: l1.daemon.is_in_log(r"check_channel: All good."))
+
+
+def test_telegram_usernames(node_factory, get_plugin):  # noqa: F811
+    os.environ["TEST_DEBUG"] = "true"
+
+    l1 = node_factory.get_node(
+        options={
+            "plugin": get_plugin,
+            "vitality-telegram-token": "4582169472:Og4grGKROE3OR-x-O3kfOsks",
+            "vitality-telegram-usernames": "936723718,936723717",
+        }
+    )
+    wait_for(
+        lambda: l1.daemon.is_in_log(r"Will try to notify 936723718, 936723717")
+    )
+
+
+def test_options(node_factory, get_plugin):  # noqa: F811
+    os.environ["TEST_DEBUG"] = "true"
+
+    node = node_factory.get_node(
+        options={
+            "plugin": get_plugin,
+            "vitality-smtp-port": 100000,
+        }
+    )
+    assert node.daemon.is_in_log(
+        r"out of range integral type conversion attempted"
+    )
+
+    node = node_factory.get_node(options={"plugin": get_plugin})
+
+    node.rpc.setconfig("vitality-telegram-token", "test")
+    assert (
+        node.rpc.listconfigs("vitality-telegram-token")["configs"][
+            "vitality-telegram-token"
+        ]["value_str"]
+        == "test"
+    )
+
+    node.rpc.setconfig("vitality-telegram-usernames", "userA, userB")
+    assert (
+        node.rpc.listconfigs("vitality-telegram-usernames")["configs"][
+            "vitality-telegram-usernames"
+        ]["value_str"]
+        == "userA, userB"
+    )
+
+    with pytest.raises(RpcError, match="is not a valid integer"):
+        node.rpc.setconfig("vitality-smtp-port", "test")
+    with pytest.raises(
+        RpcError, match="out of range integral type conversion attempted"
+    ):
+        node.rpc.setconfig("vitality-smtp-port", 99999)
+    node.rpc.setconfig("vitality-smtp-port", 9999)
+
+    node.rpc.setconfig("vitality-amboss", False)
+    with pytest.raises(RpcError) as err:
+        node.rpc.setconfig("vitality-amboss", "test")
+    assert (
+        err.value.error["message"] == "vitality-amboss is not a valid boolean!"
+    )
+    assert err.value.error["code"] == -32602
+    assert (
+        node.rpc.listconfigs("vitality-amboss")["configs"]["vitality-amboss"][
+            "value_bool"
+        ]
+        != "test"
+    )

@@ -1,170 +1,203 @@
-use std::{path::Path, sync::Arc};
-
 use anyhow::{anyhow, Error};
-use cln_plugin::ConfiguredPlugin;
-use log::{info, warn};
-use parking_lot::Mutex;
-use tokio::fs;
+use cln_plugin::{options, ConfiguredPlugin, Plugin};
+use cln_rpc::RpcError;
+use log::info;
+use serde_json::json;
 
-use crate::{structs::Config, PluginState};
+use crate::{
+    structs::Config, PluginState, OPT_AMBOSS, OPT_EMAIL_FROM, OPT_EMAIL_TO, OPT_EXPIRING_HTLCS,
+    OPT_SMTP_PASSWORD, OPT_SMTP_PORT, OPT_SMTP_SERVER, OPT_SMTP_USERNAME, OPT_TELEGRAM_TOKEN,
+    OPT_TELEGRAM_USERNAMES, OPT_WATCH_CHANNELS, OPT_WATCH_GOSSIP,
+};
 
-pub async fn read_config(
+pub async fn setconfig_callback(
+    plugin: Plugin<PluginState>,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, Error> {
+    let name = args
+        .get("config")
+        .ok_or_else(|| anyhow!("Bad CLN object. No option name found!"))?
+        .as_str()
+        .ok_or_else(|| anyhow!("Bad CLN object. Option name not a string!"))?;
+    let value = args
+        .get("val")
+        .ok_or_else(|| anyhow!("Bad CLN object. No value found for option: {name}"))?;
+
+    let opt_value = parse_option(name, value).map_err(|e| {
+        anyhow!(json!(RpcError {
+            code: Some(-32602),
+            message: e.to_string(),
+            data: None
+        }))
+    })?;
+
+    let mut config = plugin.state().config.lock();
+
+    check_option(&mut config, name, &opt_value).map_err(|e| {
+        anyhow!(json!(RpcError {
+            code: Some(-32602),
+            message: e.to_string(),
+            data: None
+        }))
+    })?;
+
+    plugin.set_option_str(name, opt_value).map_err(|e| {
+        anyhow!(json!(RpcError {
+            code: Some(-32602),
+            message: e.to_string(),
+            data: None
+        }))
+    })?;
+
+    activate_mail(&mut config);
+    activate_telegram(&mut config);
+
+    Ok(json!({}))
+}
+
+fn parse_option(name: &str, value: &serde_json::Value) -> Result<options::Value, Error> {
+    match name {
+        n if n.eq(OPT_EXPIRING_HTLCS) || n.eq(OPT_SMTP_PORT) => {
+            if let Some(n_i64) = value.as_i64() {
+                return Ok(options::Value::Integer(n_i64));
+            } else if let Some(n_str) = value.as_str() {
+                if let Ok(n_neg_i64) = n_str.parse::<i64>() {
+                    return Ok(options::Value::Integer(n_neg_i64));
+                }
+            }
+            Err(anyhow!("{} is not a valid integer!", name))
+        }
+        n if n.eq(OPT_AMBOSS) || n.eq(OPT_WATCH_CHANNELS) || n.eq(OPT_WATCH_GOSSIP) => {
+            if let Some(n_bool) = value.as_bool() {
+                return Ok(options::Value::Boolean(n_bool));
+            } else if let Some(n_str) = value.as_str() {
+                if let Ok(n_str_bool) = n_str.parse::<bool>() {
+                    return Ok(options::Value::Boolean(n_str_bool));
+                }
+            }
+            Err(anyhow!("{} is not a valid boolean!", n))
+        }
+        _ => {
+            if value.is_string() {
+                Ok(options::Value::String(value.as_str().unwrap().to_owned()))
+            } else {
+                Err(anyhow!("{} is not a valid string!", name))
+            }
+        }
+    }
+}
+
+pub async fn get_startup_options(
     plugin: &ConfiguredPlugin<PluginState, tokio::io::Stdin, tokio::io::Stdout>,
     state: PluginState,
 ) -> Result<(), Error> {
-    let dir = plugin.configuration().lightning_dir;
-    let general_configfile =
-        match fs::read_to_string(Path::new(&dir).parent().unwrap().join("config")).await {
-            Ok(file2) => file2,
-            Err(_) => {
-                warn!("No general config file found!");
-                String::new()
-            }
-        };
-    let network_configfile = match fs::read_to_string(Path::new(&dir).join("config")).await {
-        Ok(file) => file,
-        Err(_) => {
-            warn!("No network config file found!");
-            String::new()
-        }
+    let mut config = state.config.lock();
+
+    if let Some(utf8) = plugin.option_str(OPT_AMBOSS)? {
+        check_option(&mut config, OPT_AMBOSS, &utf8)?;
+    };
+    if let Some(exp) = plugin.option_str(OPT_EXPIRING_HTLCS)? {
+        check_option(&mut config, OPT_EXPIRING_HTLCS, &exp)?;
+    };
+    if let Some(watch) = plugin.option_str(OPT_WATCH_CHANNELS)? {
+        check_option(&mut config, OPT_WATCH_CHANNELS, &watch)?;
+    };
+    if let Some(goss) = plugin.option_str(OPT_WATCH_GOSSIP)? {
+        check_option(&mut config, OPT_WATCH_GOSSIP, &goss)?;
+    };
+    if let Some(tok) = plugin.option_str(OPT_TELEGRAM_TOKEN)? {
+        check_option(&mut config, OPT_TELEGRAM_TOKEN, &tok)?;
+    };
+    if let Some(tusers) = plugin.option_str(OPT_TELEGRAM_USERNAMES)? {
+        check_option(&mut config, OPT_TELEGRAM_USERNAMES, &tusers)?;
+    };
+    if let Some(smtpuser) = plugin.option_str(OPT_SMTP_USERNAME)? {
+        check_option(&mut config, OPT_SMTP_USERNAME, &smtpuser)?;
+    };
+    if let Some(smtppw) = plugin.option_str(OPT_SMTP_PASSWORD)? {
+        check_option(&mut config, OPT_SMTP_PASSWORD, &smtppw)?;
+    };
+    if let Some(smtpserver) = plugin.option_str(OPT_SMTP_SERVER)? {
+        check_option(&mut config, OPT_SMTP_SERVER, &smtpserver)?;
+    };
+    if let Some(smtpport) = plugin.option_str(OPT_SMTP_PORT)? {
+        check_option(&mut config, OPT_SMTP_PORT, &smtpport)?;
+    };
+    if let Some(emailfrom) = plugin.option_str(OPT_EMAIL_FROM)? {
+        check_option(&mut config, OPT_EMAIL_FROM, &emailfrom)?;
+    };
+    if let Some(emailto) = plugin.option_str(OPT_EMAIL_TO)? {
+        check_option(&mut config, OPT_EMAIL_TO, &emailto)?;
     };
 
-    if general_configfile.is_empty() && network_configfile.is_empty() {
-        return Err(anyhow!("No config file found!"));
-    }
-
-    parse_config_file(general_configfile, state.config.clone())?;
-    parse_config_file(network_configfile, state.config.clone())?;
+    activate_mail(&mut config);
+    activate_telegram(&mut config);
 
     Ok(())
 }
 
-fn parse_config_file(configfile: String, config: Arc<Mutex<Config>>) -> Result<(), Error> {
-    let mut config = config.lock();
-
-    for line in configfile.lines() {
-        if line.contains('=') {
-            let splitline = line.split('=').collect::<Vec<&str>>();
-            if splitline.len() == 2 {
-                let name = splitline.clone().into_iter().next().unwrap();
-                let value = splitline.into_iter().nth(1).unwrap();
-
-                match name {
-                    opt if opt.eq(&config.amboss.0) => match value.parse::<bool>() {
-                        Ok(b) => config.amboss.1 = b,
-                        Err(e) => {
-                            return Err(anyhow!(
-                                "Error: Could not parse bool from `{}` for {}: {}",
-                                value,
-                                config.amboss.0,
-                                e
-                            ))
-                        }
-                    },
-                    opt if opt.eq(&config.expiring_htlcs.0) => match value.parse::<u32>() {
-                        Ok(n) => {
-                            if n > 0 {
-                                config.expiring_htlcs.1 = n
-                            } else {
-                                return Err(anyhow!(
-                                    "Error: Number needs to be greater than 0 for {}.",
-                                    config.expiring_htlcs.0
-                                ));
-                            }
-                        }
-                        Err(e) => {
-                            return Err(anyhow!(
-                                "Error: Could not parse a positive number from `{}` for {}: {}",
-                                value,
-                                config.expiring_htlcs.0,
-                                e
-                            ))
-                        }
-                    },
-                    opt if opt.eq(&config.watch_channels.0) => match value.parse::<bool>() {
-                        Ok(b) => config.watch_channels.1 = b,
-                        Err(e) => {
-                            return Err(anyhow!(
-                                "Error: Could not parse bool from `{}` for {}: {}",
-                                value,
-                                config.watch_channels.0,
-                                e
-                            ))
-                        }
-                    },
-                    opt if opt.eq(&config.watch_gossip.0) => match value.parse::<bool>() {
-                        Ok(b) => config.watch_gossip.1 = b,
-                        Err(e) => {
-                            return Err(anyhow!(
-                                "Error: Could not parse bool from `{}` for {}: {}",
-                                value,
-                                config.watch_gossip.0,
-                                e
-                            ))
-                        }
-                    },
-                    opt if opt.eq(&config.telegram_token.0) => {
-                        config.telegram_token.1 = value.to_string()
-                    }
-                    opt if opt.eq(&config.telegram_usernames.0) => {
-                        config.telegram_usernames.1.push(value.to_string())
-                    }
-                    opt if opt.eq(&config.smtp_username.0) => {
-                        config.smtp_username.1 = value.to_string()
-                    }
-                    opt if opt.eq(&config.smtp_password.0) => {
-                        config.smtp_password.1 = value.to_string()
-                    }
-                    opt if opt.eq(&config.smtp_server.0) => {
-                        config.smtp_server.1 = value.to_string()
-                    }
-                    opt if opt.eq(&config.smtp_port.0) => match value.parse::<u16>() {
-                        Ok(n) => {
-                            if n > 0 {
-                                config.smtp_port.1 = n
-                            } else {
-                                return Err(anyhow!(
-                                    "Error: Number needs to be greater than 0 for {}.",
-                                    config.smtp_port.0
-                                ));
-                            }
-                        }
-                        Err(e) => {
-                            return Err(anyhow!(
-                                "Error: Could not parse a positive number from `{}` for {}: {}",
-                                value,
-                                config.smtp_port.0,
-                                e
-                            ))
-                        }
-                    },
-                    opt if opt.eq(&config.email_from.0) => config.email_from.1 = value.to_string(),
-                    opt if opt.eq(&config.email_to.0) => config.email_to.1 = value.to_string(),
-                    _ => (),
-                }
-            }
-        }
-    }
-
-    if !config.telegram_token.1.is_empty() && !config.telegram_usernames.1.is_empty() {
-        info!("Will try to notify via telegram");
-        config.send_telegram = true;
-    } else {
-        info!("Insufficient config for telegram notifications. Will not send telegrams.")
-    }
-
-    if !config.smtp_username.1.is_empty()
-        && !config.smtp_password.1.is_empty()
-        && !config.smtp_server.1.is_empty()
-        && config.smtp_port.1 > 0
-        && !config.email_from.1.is_empty()
-        && !config.email_to.1.is_empty()
+fn activate_mail(config: &mut Config) {
+    if !config.smtp_username.value.is_empty()
+        && !config.smtp_password.value.is_empty()
+        && !config.smtp_server.value.is_empty()
+        && !config.smtp_port.value == 0
+        && !config.email_from.value.is_empty()
+        && !config.email_to.value.is_empty()
     {
         info!("Will try to send notifications via email");
         config.send_mail = true;
     } else {
         info!("Insufficient config for email notifications. Will not send emails")
     }
+}
 
+fn activate_telegram(config: &mut Config) {
+    if !config.telegram_token.value.is_empty() && !config.telegram_usernames.value.is_empty() {
+        info!(
+            "Will try to notify {} via telegram",
+            config.telegram_usernames.value.join(", ")
+        );
+        config.send_telegram = true;
+    } else {
+        info!("Insufficient config for telegram notifications. Will not send telegrams.")
+    }
+}
+
+fn check_option(config: &mut Config, name: &str, value: &options::Value) -> Result<(), Error> {
+    match name {
+        n if n.eq(OPT_AMBOSS) => config.amboss.value = value.as_bool().unwrap(),
+        n if n.eq(OPT_EXPIRING_HTLCS) => {
+            config.expiring_htlcs.value = u32::try_from(value.as_i64().unwrap())?
+        }
+        n if n.eq(OPT_WATCH_CHANNELS) => config.watch_channels.value = value.as_bool().unwrap(),
+        n if n.eq(OPT_WATCH_GOSSIP) => config.watch_gossip.value = value.as_bool().unwrap(),
+        n if n.eq(OPT_TELEGRAM_TOKEN) => {
+            config.telegram_token.value = value.as_str().unwrap().to_string()
+        }
+        n if n.eq(OPT_TELEGRAM_USERNAMES) => {
+            let users = value.as_str().unwrap().split(',').collect::<Vec<&str>>();
+            for user in users {
+                config
+                    .telegram_usernames
+                    .value
+                    .push(user.trim().to_string())
+            }
+        }
+        n if n.eq(OPT_SMTP_USERNAME) => {
+            config.smtp_username.value = value.as_str().unwrap().to_string()
+        }
+        n if n.eq(OPT_SMTP_PASSWORD) => {
+            config.smtp_password.value = value.as_str().unwrap().to_string()
+        }
+        n if n.eq(OPT_SMTP_SERVER) => {
+            config.smtp_server.value = value.as_str().unwrap().to_string()
+        }
+        n if n.eq(OPT_SMTP_PORT) => {
+            config.smtp_port.value = u16::try_from(value.as_i64().unwrap())?
+        }
+        n if n.eq(OPT_EMAIL_FROM) => config.email_from.value = value.as_str().unwrap().to_string(),
+        n if n.eq(OPT_EMAIL_TO) => config.email_to.value = value.as_str().unwrap().to_string(),
+        _ => return Err(anyhow!("Unknown option: {}", name)),
+    }
     Ok(())
 }
