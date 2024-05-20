@@ -140,7 +140,7 @@ fn activate_mail(config: &mut Config) {
     if !config.smtp_username.value.is_empty()
         && !config.smtp_password.value.is_empty()
         && !config.smtp_server.value.is_empty()
-        && !config.smtp_port.value == 0
+        && config.smtp_port.value > 0
         && !config.email_from.value.is_empty()
         && !config.email_to.value.is_empty()
     {

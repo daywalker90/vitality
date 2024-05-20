@@ -127,3 +127,22 @@ def test_options(node_factory, get_plugin):  # noqa: F811
         ]
         != "test"
     )
+
+
+def test_email_activation(node_factory, get_plugin):  # noqa: F811
+    l1 = node_factory.get_node(
+        options={
+            "plugin": get_plugin,
+            "vitality-smtp-username": "satoshi",
+            "vitality-smtp-password": "password",
+            "vitality-smtp-server": "mail.gmx.net",
+            "vitality-smtp-port": 587,
+            "vitality-email-from": "satoshi@gmx.net",
+            "vitality-email-to": "hf@google.com",
+        }
+    )
+    wait_for(
+        lambda: l1.daemon.is_in_log(
+            "plugin-vitality: Will try to send notifications via email"
+        )
+    )
