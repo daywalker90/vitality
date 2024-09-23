@@ -137,12 +137,12 @@ pub async fn get_startup_options(
 }
 
 fn activate_mail(config: &mut Config) {
-    if !config.smtp_username.value.is_empty()
-        && !config.smtp_password.value.is_empty()
-        && !config.smtp_server.value.is_empty()
-        && config.smtp_port.value > 0
-        && !config.email_from.value.is_empty()
-        && !config.email_to.value.is_empty()
+    if !config.smtp_username.is_empty()
+        && !config.smtp_password.is_empty()
+        && !config.smtp_server.is_empty()
+        && config.smtp_port > 0
+        && !config.email_from.is_empty()
+        && !config.email_to.is_empty()
     {
         info!("Will try to send notifications via email");
         config.send_mail = true;
@@ -152,10 +152,10 @@ fn activate_mail(config: &mut Config) {
 }
 
 fn activate_telegram(config: &mut Config) {
-    if !config.telegram_token.value.is_empty() && !config.telegram_usernames.value.is_empty() {
+    if !config.telegram_token.is_empty() && !config.telegram_usernames.is_empty() {
         info!(
             "Will try to notify {} via telegram",
-            config.telegram_usernames.value.join(", ")
+            config.telegram_usernames.join(", ")
         );
         config.send_telegram = true;
     } else {
@@ -165,38 +165,27 @@ fn activate_telegram(config: &mut Config) {
 
 fn check_option(config: &mut Config, name: &str, value: &options::Value) -> Result<(), Error> {
     match name {
-        n if n.eq(OPT_AMBOSS) => config.amboss.value = value.as_bool().unwrap(),
+        n if n.eq(OPT_AMBOSS) => config.amboss = value.as_bool().unwrap(),
         n if n.eq(OPT_EXPIRING_HTLCS) => {
-            config.expiring_htlcs.value = u32::try_from(value.as_i64().unwrap())?
+            config.expiring_htlcs = u32::try_from(value.as_i64().unwrap())?
         }
-        n if n.eq(OPT_WATCH_CHANNELS) => config.watch_channels.value = value.as_bool().unwrap(),
-        n if n.eq(OPT_WATCH_GOSSIP) => config.watch_gossip.value = value.as_bool().unwrap(),
+        n if n.eq(OPT_WATCH_CHANNELS) => config.watch_channels = value.as_bool().unwrap(),
+        n if n.eq(OPT_WATCH_GOSSIP) => config.watch_gossip = value.as_bool().unwrap(),
         n if n.eq(OPT_TELEGRAM_TOKEN) => {
-            config.telegram_token.value = value.as_str().unwrap().to_string()
+            config.telegram_token = value.as_str().unwrap().to_string()
         }
         n if n.eq(OPT_TELEGRAM_USERNAMES) => {
             let users = value.as_str().unwrap().split(',').collect::<Vec<&str>>();
             for user in users {
-                config
-                    .telegram_usernames
-                    .value
-                    .push(user.trim().to_string())
+                config.telegram_usernames.push(user.trim().to_string())
             }
         }
-        n if n.eq(OPT_SMTP_USERNAME) => {
-            config.smtp_username.value = value.as_str().unwrap().to_string()
-        }
-        n if n.eq(OPT_SMTP_PASSWORD) => {
-            config.smtp_password.value = value.as_str().unwrap().to_string()
-        }
-        n if n.eq(OPT_SMTP_SERVER) => {
-            config.smtp_server.value = value.as_str().unwrap().to_string()
-        }
-        n if n.eq(OPT_SMTP_PORT) => {
-            config.smtp_port.value = u16::try_from(value.as_i64().unwrap())?
-        }
-        n if n.eq(OPT_EMAIL_FROM) => config.email_from.value = value.as_str().unwrap().to_string(),
-        n if n.eq(OPT_EMAIL_TO) => config.email_to.value = value.as_str().unwrap().to_string(),
+        n if n.eq(OPT_SMTP_USERNAME) => config.smtp_username = value.as_str().unwrap().to_string(),
+        n if n.eq(OPT_SMTP_PASSWORD) => config.smtp_password = value.as_str().unwrap().to_string(),
+        n if n.eq(OPT_SMTP_SERVER) => config.smtp_server = value.as_str().unwrap().to_string(),
+        n if n.eq(OPT_SMTP_PORT) => config.smtp_port = u16::try_from(value.as_i64().unwrap())?,
+        n if n.eq(OPT_EMAIL_FROM) => config.email_from = value.as_str().unwrap().to_string(),
+        n if n.eq(OPT_EMAIL_TO) => config.email_to = value.as_str().unwrap().to_string(),
         _ => return Err(anyhow!("Unknown option: {}", name)),
     }
     Ok(())

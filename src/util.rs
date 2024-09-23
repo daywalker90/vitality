@@ -52,26 +52,23 @@ pub async fn send_mail(
     };
 
     let email = Message::builder()
-        .from(config.email_from.value.parse().unwrap())
-        .to(config.email_to.value.parse().unwrap())
+        .from(config.email_from.parse().unwrap())
+        .to(config.email_to.parse().unwrap())
         .subject(subject.clone())
         .header(header)
         .body(body.to_string())
         .unwrap();
 
-    let creds = Credentials::new(
-        config.smtp_username.value.clone(),
-        config.smtp_password.value.clone(),
-    );
+    let creds = Credentials::new(config.smtp_username.clone(), config.smtp_password.clone());
 
-    let tls_parameters = TlsParameters::builder(config.smtp_server.value.clone())
+    let tls_parameters = TlsParameters::builder(config.smtp_server.clone())
         .dangerous_accept_invalid_certs(false)
         .build_rustls()?;
 
-    let mailer = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.smtp_server.value)?
+    let mailer = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.smtp_server)?
         .credentials(creds)
         .tls(Tls::Required(tls_parameters))
-        .port(config.smtp_port.value)
+        .port(config.smtp_port)
         .timeout(Some(Duration::from_secs(60)))
         .build();
 
@@ -80,7 +77,7 @@ pub async fn send_mail(
     if result.is_ok() {
         info!(
             "Sent email with subject: `{}` to: `{}`",
-            subject, config.email_to.value
+            subject, config.email_to
         );
         Ok(())
     } else {
@@ -89,9 +86,9 @@ pub async fn send_mail(
 }
 
 pub async fn send_telegram(config: &Config, subject: &String, body: &String) -> Result<(), Error> {
-    let bot = Bot::new(config.telegram_token.value.clone());
+    let bot = Bot::new(config.telegram_token.clone());
 
-    for username in &config.telegram_usernames.value {
+    for username in &config.telegram_usernames {
         let mut message = format!("{}\n{}", subject, body);
         if message.len() > 4000 {
             message = message[..4000].to_string()

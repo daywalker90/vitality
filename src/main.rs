@@ -115,7 +115,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if let Ok(plugin) = confplugin.start(state).await {
         let config = plugin.state().config.lock().clone();
 
-        if config.amboss.value {
+        if config.amboss {
             info!("Starting amboss online ping task");
             let healthclone = plugin.clone();
             tokio::spawn(async move {
@@ -147,7 +147,7 @@ async fn main() -> Result<(), anyhow::Error> {
             });
         }
 
-        if config.expiring_htlcs.value > 0 || config.watch_channels.value {
+        if config.expiring_htlcs > 0 || config.watch_channels {
             let channel_clone = plugin.clone();
             tokio::spawn(async move {
                 match channelwatch::check_channels_loop(channel_clone.clone()).await {
