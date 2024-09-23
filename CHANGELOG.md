@@ -5,6 +5,9 @@
 ### Added
 - nix flake (thanks to @RCasatta)
 
+### Changed
+- updated dependencies
+
 ## [0.1.10] - 2024-06-05
 
 ### Changed
