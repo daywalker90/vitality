@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.0] - 2024-09-23
+
+### Added
+- nix flake (thanks to @RCasatta)
+
 ## [0.1.10] - 2024-06-05
 
 ### Changed

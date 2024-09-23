@@ -1,6 +1,6 @@
 [package]
 name = "vitality"
-version = "0.1.10"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -14,12 +14,12 @@ serde_json = "1.0"
 # bitcoincore-rpc = "0.17.0"
 
 tokio = { version = "1", features = ["sync","rt-multi-thread"] }
-cln-rpc = "0.1.9"
+cln-rpc = "0.2"
 # cln-rpc = { path="../lightning/cln-rpc/", version = "^0.1" }
-cln-plugin = "0.1.9"
+cln-plugin = "0.2"
 # cln-plugin = { path="../lightning/plugins/", version = "^0.1" }
 
-teloxide ={ version = "0.12", default-features = false, features = ["rustls"]}
+teloxide ={ version = "0.13", default-features = false, features = ["rustls"]}
 
 chrono = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["json","rustls-tls"] }
@@ -31,7 +31,7 @@ log-panics = "2"
 lettre = {version = "0.11", default-features = false, features = ["tokio1-rustls-tls","smtp-transport","builder"]}
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = "0.5"
+tikv-jemallocator = "0.6"
 
 [profile.optimized]
 inherits = "release"
