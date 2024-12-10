@@ -259,7 +259,11 @@ fn check_slackers(
                             specific_error_found = true;
                         }
                     }
-                    if !chan.peer_connected && !contained_reconnect && !specific_error_found {
+                    if !chan.peer_connected
+                        && !contained_reconnect
+                        && !config.is_at_or_above_24_11
+                        && !specific_error_found
+                    {
                         warn!(
                             "check_channel: Found disconnected peer that does not want to \
                             reconnect: {} status instead is: {}",

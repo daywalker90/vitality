@@ -1,3 +1,7 @@
+use std::path::Path;
+
+use cln_rpc::model::requests::GetinfoRequest;
+use cln_rpc::ClnRpc;
 use config::setconfig_callback;
 use serde_json::json;
 #[cfg(not(target_env = "msvc"))]
@@ -103,7 +107,11 @@ async fn main() -> Result<(), anyhow::Error> {
             //     Ok(()) => &(),
             //     Err(e) => return plugin.disable(format!("{}", e).as_str()).await,
             // };
-            match get_startup_options(&plugin, state.clone()).await {
+            let rpc_path = Path::new(&plugin.configuration().lightning_dir)
+                .join(plugin.configuration().rpc_file);
+            let mut rpc = ClnRpc::new(&rpc_path).await?;
+            let getinfo = rpc.call_typed(&GetinfoRequest {}).await?;
+            match get_startup_options(&plugin, state.clone(), getinfo).await {
                 Ok(()) => &(),
                 Err(e) => return plugin.disable(format!("{}", e).as_str()).await,
             };

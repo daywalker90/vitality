@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.1] - 2024-12-09
+
+### Fixed
+
+- CLN 24.11: false positive detection of unwilling-to-reconnect peers, vitality can't detect this in CLN 24.11 since the status never? shows the reconnect attempts
+
 ## [0.2.0] - 2024-09-23
 
 ### Added

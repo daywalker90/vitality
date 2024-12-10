@@ -20,6 +20,7 @@ pub struct Config {
     pub email_to: String,
     pub send_mail: bool,
     pub send_telegram: bool,
+    pub is_at_or_above_24_11: bool,
 }
 impl Config {
     pub fn new() -> Config {
@@ -38,6 +39,7 @@ impl Config {
             email_to: String::new(),
             send_mail: false,
             send_telegram: false,
+            is_at_or_above_24_11: false,
         }
     }
 }

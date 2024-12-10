@@ -1,13 +1,14 @@
 use anyhow::{anyhow, Error};
 use cln_plugin::{options, ConfiguredPlugin, Plugin};
-use cln_rpc::RpcError;
+use cln_rpc::{model::responses::GetinfoResponse, RpcError};
 use log::info;
 use serde_json::json;
 
 use crate::{
-    structs::Config, PluginState, OPT_AMBOSS, OPT_EMAIL_FROM, OPT_EMAIL_TO, OPT_EXPIRING_HTLCS,
-    OPT_SMTP_PASSWORD, OPT_SMTP_PORT, OPT_SMTP_SERVER, OPT_SMTP_USERNAME, OPT_TELEGRAM_TOKEN,
-    OPT_TELEGRAM_USERNAMES, OPT_WATCH_CHANNELS, OPT_WATCH_GOSSIP,
+    structs::Config, util::at_or_above_version, PluginState, OPT_AMBOSS, OPT_EMAIL_FROM,
+    OPT_EMAIL_TO, OPT_EXPIRING_HTLCS, OPT_SMTP_PASSWORD, OPT_SMTP_PORT, OPT_SMTP_SERVER,
+    OPT_SMTP_USERNAME, OPT_TELEGRAM_TOKEN, OPT_TELEGRAM_USERNAMES, OPT_WATCH_CHANNELS,
+    OPT_WATCH_GOSSIP,
 };
 
 pub async fn setconfig_callback(
@@ -90,8 +91,11 @@ fn parse_option(name: &str, value: &serde_json::Value) -> Result<options::Value,
 pub async fn get_startup_options(
     plugin: &ConfiguredPlugin<PluginState, tokio::io::Stdin, tokio::io::Stdout>,
     state: PluginState,
+    info: GetinfoResponse,
 ) -> Result<(), Error> {
     let mut config = state.config.lock();
+
+    config.is_at_or_above_24_11 = at_or_above_version(&info.version, "24.11")?;
 
     if let Some(utf8) = plugin.option_str(OPT_AMBOSS)? {
         check_option(&mut config, OPT_AMBOSS, &utf8)?;
