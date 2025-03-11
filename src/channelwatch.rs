@@ -9,11 +9,9 @@ use cln_rpc::{
             ConnectRequest, DisconnectRequest, GetinfoRequest, ListchannelsRequest,
             ListnodesRequest, ListpeerchannelsRequest,
         },
-        responses::{
-            ListchannelsChannels, ListpeerchannelsChannels, ListpeerchannelsChannelsState,
-        },
+        responses::{ListchannelsChannels, ListpeerchannelsChannels},
     },
-    primitives::{PublicKey, ShortChannelId},
+    primitives::{ChannelState, PublicKey, ShortChannelId},
     ClnRpc,
 };
 use log::{debug, info, warn};
@@ -193,8 +191,7 @@ fn check_slackers(
 ) {
     for chan in channels {
         match chan.state {
-            ListpeerchannelsChannelsState::CHANNELD_NORMAL
-            | ListpeerchannelsChannelsState::CHANNELD_AWAITING_SPLICE => {
+            ChannelState::CHANNELD_NORMAL | ChannelState::CHANNELD_AWAITING_SPLICE => {
                 if config.watch_channels {
                     let statuses = chan.status.as_ref().unwrap();
                     let mut contained_reconnect = false;
