@@ -66,10 +66,7 @@ async fn amboss_ping(plugin: Plugin<PluginState>) -> Result<(), Error> {
         }
     }
     if health_check_success {
-        info!(
-            "Amboss ping succeeded in: {}ms",
-            now.elapsed().as_millis().to_string()
-        );
+        info!("Amboss ping succeeded in: {}ms", now.elapsed().as_millis());
         Ok(())
     } else {
         Err(anyhow!("Amboss ping error: {}", response_text))
@@ -83,7 +80,7 @@ pub async fn amboss_ping_loop(plugin: Plugin<PluginState>) -> Result<(), Error> 
             match amboss_ping(plugin.clone()).await {
                 Ok(_succ) => sleep_time_s = 300,
                 Err(e) => {
-                    warn!("Error in amboss_ping: {}", e.to_string());
+                    warn!("Error in amboss_ping: {}", e);
 
                     if sleep_time_s >= 300 {
                         sleep_time_s = 10;

@@ -467,7 +467,7 @@ pub async fn check_channels_loop(plugin: Plugin<PluginState>) -> Result<(), Erro
             match check_channel(plugin.clone()).await {
                 Ok(_succ) => (),
                 Err(e) => {
-                    warn!("Error in check_channel: {}", e.to_string());
+                    warn!("Error in check_channel: {}", e);
                     let config = plugin.state().config.lock().clone();
                     let subject = "Channel check error".to_string();
                     let body = e.to_string();

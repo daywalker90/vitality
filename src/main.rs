@@ -130,7 +130,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 match amboss::amboss_ping_loop(healthclone.clone()).await {
                     Ok(()) => (),
                     Err(e) => {
-                        warn!("Error in amboss_ping_loop thread: {}", e.to_string());
+                        warn!("Error in amboss_ping_loop thread: {}", e);
                         let config = healthclone.state().config.lock().clone();
                         let subject = "ALARM: amboss_ping_loop Error".to_string();
                         let body = e.to_string();
@@ -138,7 +138,7 @@ async fn main() -> Result<(), anyhow::Error> {
                             match send_mail(&config, &subject, &body, false).await {
                                 Ok(_) => (),
                                 Err(er) => {
-                                    warn!("amboss_ping_loop: Mail failed: {}", er.to_string())
+                                    warn!("amboss_ping_loop: Mail failed: {}", er)
                                 }
                             };
                         }
@@ -146,7 +146,7 @@ async fn main() -> Result<(), anyhow::Error> {
                             match send_telegram(&config, &subject, &body).await {
                                 Ok(_) => (),
                                 Err(er) => {
-                                    warn!("amboss_ping_loop: Telegram failed: {}", er.to_string())
+                                    warn!("amboss_ping_loop: Telegram failed: {}", er)
                                 }
                             };
                         }
@@ -161,26 +161,20 @@ async fn main() -> Result<(), anyhow::Error> {
                 match channelwatch::check_channels_loop(channel_clone.clone()).await {
                     Ok(()) => (),
                     Err(e) => {
-                        warn!("Error in check_channels_loop thread: {}", e.to_string());
+                        warn!("Error in check_channels_loop thread: {}", e);
                         let config = channel_clone.state().config.lock().clone();
                         let subject = "ALARM: check_channels_loop Error".to_string();
                         let body = e.to_string();
                         if config.send_mail {
                             match send_mail(&config, &subject, &body, false).await {
                                 Ok(_) => (),
-                                Err(er) => warn!(
-                                    "check_channels_loop: Unexpected Error: {}",
-                                    er.to_string()
-                                ),
+                                Err(er) => warn!("check_channels_loop: Unexpected Error: {}", er),
                             };
                         }
                         if config.send_telegram {
                             match send_telegram(&config, &subject, &body).await {
                                 Ok(_) => (),
-                                Err(er) => warn!(
-                                    "check_channels_loop: Unexpected Error: {}",
-                                    er.to_string()
-                                ),
+                                Err(er) => warn!("check_channels_loop: Unexpected Error: {}", er),
                             };
                         }
                     }
