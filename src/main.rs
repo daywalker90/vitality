@@ -3,13 +3,11 @@ use std::path::Path;
 use cln_rpc::model::requests::GetinfoRequest;
 use cln_rpc::ClnRpc;
 use config::setconfig_callback;
+use mimalloc::MiMalloc;
 use serde_json::json;
-#[cfg(not(target_env = "msvc"))]
-use tikv_jemallocator::Jemalloc;
 
-#[cfg(not(target_env = "msvc"))]
 #[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
+static GLOBAL: MiMalloc = MiMalloc;
 
 extern crate serde_json;
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3] - 2025-10-09
+
+### Changed
+- switched out jemalloc with mimalloc for better compatibility
+- upgraded dependencies
+
+
 ## [0.2.2] - 2025-03-11
 
 ### Changed

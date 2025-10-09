@@ -1,6 +1,6 @@
 [package]
 name = "vitality"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 rust-version = "1.85"
 
@@ -14,25 +14,31 @@ log = { version = "0.4", features = ['std'] }
 serde_json = "1"
 # bitcoincore-rpc = "0.17.0"
 
-tokio = { version = "1", features = ["sync","rt-multi-thread"] }
+tokio = { version = "1", features = ["sync", "rt-multi-thread"] }
 cln-rpc = "0.4"
 # cln-rpc = { path="../lightning/cln-rpc/", version = "^0.4" }
 cln-plugin = "0.4"
 # cln-plugin = { path="../lightning/plugins/", version = "^0.4" }
 
-teloxide ={ version = "0.15", default-features = false, features = ["rustls"]}
+teloxide = { version = "0.17", default-features = false, features = ["rustls"] }
 
 chrono = "0.4"
-reqwest = { version = "0.12", default-features = false, features = ["json","rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "rustls-tls",
+] }
 
 parking_lot = "0.12"
 
 log-panics = "2"
 
-lettre = {version = "0.11", default-features = false, features = ["tokio1-rustls-tls","smtp-transport","builder"]}
+lettre = { version = "0.11", default-features = false, features = [
+    "tokio1-rustls-tls",
+    "smtp-transport",
+    "builder",
+] }
 
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = "0.6"
+mimalloc = "0.1"
 
 [profile.optimized]
 inherits = "release"
