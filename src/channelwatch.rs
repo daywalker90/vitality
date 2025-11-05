@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, time::Duration};
 
-use anyhow::Error;
+use anyhow::{anyhow, Error};
 use cln_plugin::Plugin;
 
 use cln_rpc::{
@@ -60,7 +60,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         &mut peer_slackers,
         current_blockheight,
         &gossip,
-    );
+    )?;
 
     let peer_map = channels
         .into_iter()
@@ -146,7 +146,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         &mut peer_slackers,
         current_blockheight,
         &gossip,
-    );
+    )?;
 
     if !peer_slackers.is_empty() {
         let final_peer_slackers: Vec<String> = peer_slackers
@@ -188,9 +188,41 @@ fn check_slackers(
     peer_slackers: &mut HashMap<PublicKey, Vec<String>>,
     current_blockheight: u32,
     gossip: &Option<HashMap<ShortChannelId, Vec<ListchannelsChannels>>>,
-) {
+) -> Result<(), anyhow::Error> {
     for chan in channels {
         match chan.state {
+            ChannelState::CHANNELD_AWAITING_LOCKIN => {
+                if config.watch_channels {
+                    let statuses = chan
+                        .status
+                        .as_ref()
+                        .ok_or_else(|| anyhow!("No status found"))?;
+                    for status in statuses {
+                        if status.contains("We've confirmed channel ready, they haven't yet.") {
+                            warn!(
+                                "check_channel: Peer won't lockin our channel: {} status: {}",
+                                chan.peer_id, status
+                            );
+                            update_slackers(
+                                peer_slackers,
+                                chan.peer_id,
+                                format!("Peer won't lockin our channel. Status: {}", status),
+                            );
+                        }
+                        if status.contains("Sent reestablish, waiting for theirs") {
+                            warn!(
+                                "check_channel: Peer won't reestablish our channel: {} status: {}",
+                                chan.peer_id, status
+                            );
+                            update_slackers(
+                                peer_slackers,
+                                chan.peer_id,
+                                format!("Peer won't reestablish our channel. Status: {}", status),
+                            );
+                        }
+                    }
+                }
+            }
             ChannelState::CHANNELD_NORMAL | ChannelState::CHANNELD_AWAITING_SPLICE => {
                 if config.watch_channels {
                     let statuses = chan.status.as_ref().unwrap();
@@ -390,6 +422,7 @@ fn check_slackers(
             _ => continue,
         }
     }
+    Ok(())
 }
 
 async fn get_gossip_map(
