@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- check for slow/stuck channel openings/reestablishings
+
 ## [0.2.3] - 2025-10-09
 
 ### Changed
