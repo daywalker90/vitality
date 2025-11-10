@@ -5,18 +5,21 @@ use std::{
 
 use anyhow::{anyhow, Error};
 use cln_plugin::Plugin;
-use log::{info, warn};
-use teloxide::{requests::Requester, Bot};
-
-use crate::structs::{Config, PluginState};
 use lettre::{
     message::header::ContentType,
     transport::smtp::{
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
-    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+    AsyncSmtpTransport,
+    AsyncTransport,
+    Message,
+    Tokio1Executor,
 };
+use log::{info, warn};
+use teloxide::{requests::Requester, Bot};
+
+use crate::structs::{Config, PluginState};
 
 // pub async fn get_alias_map(
 //     plugin: Plugin<PluginState>,

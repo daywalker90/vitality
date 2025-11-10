@@ -1,9 +1,8 @@
 use std::time::Duration;
 
 use anyhow::{anyhow, Error};
-use cln_plugin::Plugin;
-
 use chrono::Utc;
+use cln_plugin::Plugin;
 use cln_rpc::{model::requests::SignmessageRequest, ClnRpc};
 use log::{info, warn};
 use reqwest::Client;

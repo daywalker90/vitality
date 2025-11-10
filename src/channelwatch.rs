@@ -2,12 +2,15 @@ use std::{collections::HashMap, env, time::Duration};
 
 use anyhow::{anyhow, Error};
 use cln_plugin::Plugin;
-
 use cln_rpc::{
     model::{
         requests::{
-            ConnectRequest, DisconnectRequest, GetinfoRequest, ListchannelsRequest,
-            ListnodesRequest, ListpeerchannelsRequest,
+            ConnectRequest,
+            DisconnectRequest,
+            GetinfoRequest,
+            ListchannelsRequest,
+            ListnodesRequest,
+            ListpeerchannelsRequest,
         },
         responses::{ListchannelsChannels, ListpeerchannelsChannels},
     },

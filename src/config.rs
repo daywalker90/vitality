@@ -5,9 +5,20 @@ use log::info;
 use serde_json::json;
 
 use crate::{
-    structs::Config, util::at_or_above_version, PluginState, OPT_AMBOSS, OPT_EMAIL_FROM,
-    OPT_EMAIL_TO, OPT_EXPIRING_HTLCS, OPT_SMTP_PASSWORD, OPT_SMTP_PORT, OPT_SMTP_SERVER,
-    OPT_SMTP_USERNAME, OPT_TELEGRAM_TOKEN, OPT_TELEGRAM_USERNAMES, OPT_WATCH_CHANNELS,
+    structs::Config,
+    util::at_or_above_version,
+    PluginState,
+    OPT_AMBOSS,
+    OPT_EMAIL_FROM,
+    OPT_EMAIL_TO,
+    OPT_EXPIRING_HTLCS,
+    OPT_SMTP_PASSWORD,
+    OPT_SMTP_PORT,
+    OPT_SMTP_SERVER,
+    OPT_SMTP_USERNAME,
+    OPT_TELEGRAM_TOKEN,
+    OPT_TELEGRAM_USERNAMES,
+    OPT_WATCH_CHANNELS,
     OPT_WATCH_GOSSIP,
 };
 

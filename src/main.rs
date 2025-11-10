@@ -1,7 +1,6 @@
 use std::path::Path;
 
-use cln_rpc::model::requests::GetinfoRequest;
-use cln_rpc::ClnRpc;
+use cln_rpc::{model::requests::GetinfoRequest, ClnRpc};
 use config::setconfig_callback;
 use mimalloc::MiMalloc;
 use serde_json::json;
@@ -11,17 +10,20 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 extern crate serde_json;
 
-use crate::config::get_startup_options;
-use crate::util::{send_mail, send_telegram};
-
 use anyhow::anyhow;
-use cln_plugin::options::{
-    BooleanConfigOption, ConfigOption, IntegerConfigOption, StringConfigOption,
+use cln_plugin::{
+    options::{BooleanConfigOption, ConfigOption, IntegerConfigOption, StringConfigOption},
+    Builder,
+    Error,
+    Plugin,
 };
-use cln_plugin::{Builder, Error, Plugin};
-
 use log::{info, warn};
 use structs::{PluginState, PLUGIN_NAME};
+
+use crate::{
+    config::get_startup_options,
+    util::{send_mail, send_telegram},
+};
 
 mod amboss;
 mod channelwatch;
