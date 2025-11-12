@@ -33,7 +33,10 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
     let mut rpc = ClnRpc::new(&rpc_path).await?;
 
     let channels = rpc
-        .call_typed(&ListpeerchannelsRequest { id: None })
+        .call_typed(&ListpeerchannelsRequest {
+            id: None,
+            short_channel_id: None,
+        })
         .await?
         .channels;
     info!("check_channel: Got state of all local channels");
@@ -133,7 +136,10 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
     }
 
     let channels = rpc
-        .call_typed(&ListpeerchannelsRequest { id: None })
+        .call_typed(&ListpeerchannelsRequest {
+            id: None,
+            short_channel_id: None,
+        })
         .await?
         .channels;
     let gossip = if config.watch_gossip {
