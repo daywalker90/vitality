@@ -1,9 +1,12 @@
 # Changelog
 
-## Unreleased
+## [0.2.4] - 2026-03-29
 
 ### Added
 - check for slow/stuck channel openings/reestablishings
+
+### Changed
+- updated `cln-rpc` and `cln-plugin` dependencies
 
 ## [0.2.3] - 2025-10-09
 

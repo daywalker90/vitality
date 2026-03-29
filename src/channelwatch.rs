@@ -36,6 +36,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         .call_typed(&ListpeerchannelsRequest {
             id: None,
             short_channel_id: None,
+            channel_id: None,
         })
         .await?
         .channels;
@@ -139,6 +140,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         .call_typed(&ListpeerchannelsRequest {
             id: None,
             short_channel_id: None,
+            channel_id: None,
         })
         .await?
         .channels;

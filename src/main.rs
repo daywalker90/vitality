@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use cln_rpc::{model::requests::GetinfoRequest, ClnRpc};
+use cln_rpc::{ClnRpc, model::requests::GetinfoRequest};
 use config::setconfig_callback;
 use mimalloc::MiMalloc;
 use serde_json::json;
@@ -12,13 +12,13 @@ extern crate serde_json;
 
 use anyhow::anyhow;
 use cln_plugin::{
-    options::{BooleanConfigOption, ConfigOption, IntegerConfigOption, StringConfigOption},
     Builder,
     Error,
     Plugin,
+    options::{BooleanConfigOption, ConfigOption, IntegerConfigOption, StringConfigOption},
 };
 use log::{info, warn};
-use structs::{PluginState, PLUGIN_NAME};
+use structs::{PLUGIN_NAME, PluginState};
 
 use crate::{
     config::get_startup_options,
@@ -46,7 +46,7 @@ const OPT_EMAIL_TO: &str = "vitality-email-to";
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    std::env::set_var("CLN_PLUGIN_LOG", "vitality=debug,info");
+    unsafe { std::env::set_var("CLN_PLUGIN_LOG", "vitality=debug,info") };
     log_panics::init();
     let state = PluginState::new();
     let opt_amboss: BooleanConfigOption =
@@ -120,71 +120,76 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         None => return Err(anyhow!("Error configuring the plugin!")),
     };
-    if let Ok(plugin) = confplugin.start(state).await {
-        let config = plugin.state().config.lock().clone();
+    match confplugin.start(state).await {
+        Ok(plugin) => {
+            let config = plugin.state().config.lock().clone();
 
-        if config.amboss {
-            info!("Starting amboss online ping task");
-            let healthclone = plugin.clone();
-            tokio::spawn(async move {
-                match amboss::amboss_ping_loop(healthclone.clone()).await {
-                    Ok(()) => (),
-                    Err(e) => {
-                        warn!("Error in amboss_ping_loop thread: {}", e);
-                        let config = healthclone.state().config.lock().clone();
-                        let subject = "ALARM: amboss_ping_loop Error".to_string();
-                        let body = e.to_string();
-                        if config.send_mail {
-                            match send_mail(&config, &subject, &body, false).await {
-                                Ok(_) => (),
-                                Err(er) => {
-                                    warn!("amboss_ping_loop: Mail failed: {}", er)
-                                }
-                            };
+            if config.amboss {
+                info!("Starting amboss online ping task");
+                let healthclone = plugin.clone();
+                tokio::spawn(async move {
+                    match amboss::amboss_ping_loop(healthclone.clone()).await {
+                        Ok(()) => (),
+                        Err(e) => {
+                            warn!("Error in amboss_ping_loop thread: {}", e);
+                            let config = healthclone.state().config.lock().clone();
+                            let subject = "ALARM: amboss_ping_loop Error".to_string();
+                            let body = e.to_string();
+                            if config.send_mail {
+                                match send_mail(&config, &subject, &body, false).await {
+                                    Ok(_) => (),
+                                    Err(er) => {
+                                        warn!("amboss_ping_loop: Mail failed: {}", er)
+                                    }
+                                };
+                            }
+                            if config.send_telegram {
+                                match send_telegram(&config, &subject, &body).await {
+                                    Ok(_) => (),
+                                    Err(er) => {
+                                        warn!("amboss_ping_loop: Telegram failed: {}", er)
+                                    }
+                                };
+                            }
                         }
-                        if config.send_telegram {
-                            match send_telegram(&config, &subject, &body).await {
-                                Ok(_) => (),
-                                Err(er) => {
-                                    warn!("amboss_ping_loop: Telegram failed: {}", er)
-                                }
-                            };
+                    };
+                });
+            }
+
+            if config.expiring_htlcs > 0 || config.watch_channels {
+                let channel_clone = plugin.clone();
+                tokio::spawn(async move {
+                    match channelwatch::check_channels_loop(channel_clone.clone()).await {
+                        Ok(()) => (),
+                        Err(e) => {
+                            warn!("Error in check_channels_loop thread: {}", e);
+                            let config = channel_clone.state().config.lock().clone();
+                            let subject = "ALARM: check_channels_loop Error".to_string();
+                            let body = e.to_string();
+                            if config.send_mail {
+                                match send_mail(&config, &subject, &body, false).await {
+                                    Ok(_) => (),
+                                    Err(er) => {
+                                        warn!("check_channels_loop: Unexpected Error: {}", er)
+                                    }
+                                };
+                            }
+                            if config.send_telegram {
+                                match send_telegram(&config, &subject, &body).await {
+                                    Ok(_) => (),
+                                    Err(er) => {
+                                        warn!("check_channels_loop: Unexpected Error: {}", er)
+                                    }
+                                };
+                            }
                         }
-                    }
-                };
-            });
+                    };
+                });
+            }
+
+            plugin.join().await
         }
-
-        if config.expiring_htlcs > 0 || config.watch_channels {
-            let channel_clone = plugin.clone();
-            tokio::spawn(async move {
-                match channelwatch::check_channels_loop(channel_clone.clone()).await {
-                    Ok(()) => (),
-                    Err(e) => {
-                        warn!("Error in check_channels_loop thread: {}", e);
-                        let config = channel_clone.state().config.lock().clone();
-                        let subject = "ALARM: check_channels_loop Error".to_string();
-                        let body = e.to_string();
-                        if config.send_mail {
-                            match send_mail(&config, &subject, &body, false).await {
-                                Ok(_) => (),
-                                Err(er) => warn!("check_channels_loop: Unexpected Error: {}", er),
-                            };
-                        }
-                        if config.send_telegram {
-                            match send_telegram(&config, &subject, &body).await {
-                                Ok(_) => (),
-                                Err(er) => warn!("check_channels_loop: Unexpected Error: {}", er),
-                            };
-                        }
-                    }
-                };
-            });
-        }
-
-        plugin.join().await
-    } else {
-        Err(anyhow!("Error starting the plugin!"))
+        _ => Err(anyhow!("Error starting the plugin!")),
     }
 }
 
