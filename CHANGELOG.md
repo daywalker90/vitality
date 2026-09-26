@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0] - 2026-09-26
+
+### Changed
+- updated dependencies
+
+### Removed
+- telegram options and notifications
+
 ## [0.2.4] - 2026-03-29
 
 ### Added
