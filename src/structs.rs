@@ -5,13 +5,12 @@ use parking_lot::Mutex;
 pub const PLUGIN_NAME: &str = "vitality";
 
 #[derive(Clone, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Config {
     pub amboss: bool,
     pub expiring_htlcs: u32,
     pub watch_channels: bool,
     pub watch_gossip: bool,
-    pub telegram_token: String,
-    pub telegram_usernames: Vec<String>,
     pub smtp_username: String,
     pub smtp_password: String,
     pub smtp_server: String,
@@ -19,8 +18,6 @@ pub struct Config {
     pub email_from: String,
     pub email_to: String,
     pub send_mail: bool,
-    pub send_telegram: bool,
-    pub is_at_or_above_24_11: bool,
 }
 impl Config {
     pub fn new() -> Config {
@@ -29,8 +26,6 @@ impl Config {
             expiring_htlcs: 0,
             watch_channels: true,
             watch_gossip: false,
-            telegram_token: String::new(),
-            telegram_usernames: Vec::new(),
             smtp_username: String::new(),
             smtp_password: String::new(),
             smtp_server: String::new(),
@@ -38,8 +33,6 @@ impl Config {
             email_from: String::new(),
             email_to: String::new(),
             send_mail: false,
-            send_telegram: false,
-            is_at_or_above_24_11: false,
         }
     }
 }

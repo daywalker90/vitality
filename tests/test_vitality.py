@@ -1,9 +1,8 @@
-#!/usr/bin/python
 import os
 
 import pytest
 from pyln.client import RpcError
-from pyln.testing.fixtures import *  # noqa: F403
+from pyln.testing.fixtures import *
 from pyln.testing.utils import sync_blockheight, wait_for
 from util import get_plugin  # noqa: F401
 
@@ -16,8 +15,6 @@ def test_basic(node_factory, bitcoind, get_plugin):  # noqa: F811
         "vitality-expiring-htlcs": "50",
         "vitality-watch-channels": "true",
         "vitality-watch-gossip": "true",
-        "vitality-telegram-token": "4582169472:Og4grGKROE3OR-x-O3kfOsks",
-        "vitality-telegram-usernames": "936723718",
         "vitality-smtp-username": "satoshi@gmx.de",
         "vitality-smtp-password": "WEJF§IFJseo32",
         "vitality-smtp-server": "mail.gmx.net",
@@ -36,43 +33,22 @@ def test_basic(node_factory, bitcoind, get_plugin):  # noqa: F811
     bitcoind.generate_block(6)
     sync_blockheight(bitcoind, [l1, l2])
 
-    wait_for(
-        lambda: len(l1.rpc.listpeerchannels(l2.info["id"])["channels"]) > 0
-    )
-    scid = l1.rpc.listpeerchannels(l2.info["id"])["channels"][0][
-        "short_channel_id"
-    ]
+    wait_for(lambda: len(l1.rpc.listpeerchannels(l2.info["id"])["channels"]) > 0)
+    scid = l1.rpc.listpeerchannels(l2.info["id"])["channels"][0]["short_channel_id"]
     wait_for(lambda: len(l1.rpc.listchannels(str(scid))["channels"]) == 2)
     wait_for(
         lambda: all(
-            chan["public"]
-            for chan in l1.rpc.listchannels(str(scid))["channels"]
+            chan["public"] for chan in l1.rpc.listchannels(str(scid))["channels"]
         )
     )
     wait_for(
         lambda: all(
-            chan["active"]
-            for chan in l1.rpc.listchannels(str(scid))["channels"]
+            chan["active"] for chan in l1.rpc.listchannels(str(scid))["channels"]
         )
     )
 
     wait_for(lambda: l1.daemon.is_in_log(r"Error in amboss_ping"))
     wait_for(lambda: l1.daemon.is_in_log(r"check_channel: All good."))
-
-
-def test_telegram_usernames(node_factory, get_plugin):  # noqa: F811
-    os.environ["TEST_DEBUG"] = "true"
-
-    l1 = node_factory.get_node(
-        options={
-            "plugin": get_plugin,
-            "vitality-telegram-token": "4582169472:Og4grGKROE3OR-x-O3kfOsks",
-            "vitality-telegram-usernames": "936723718,936723717",
-        }
-    )
-    wait_for(
-        lambda: l1.daemon.is_in_log(r"Will try to notify 936723718, 936723717")
-    )
 
 
 def test_options(node_factory, get_plugin):  # noqa: F811
@@ -84,26 +60,16 @@ def test_options(node_factory, get_plugin):  # noqa: F811
             "vitality-smtp-port": 100000,
         }
     )
-    assert node.daemon.is_in_log(
-        r"out of range integral type conversion attempted"
-    )
+    assert node.daemon.is_in_log(r"out of range integral type conversion attempted")
 
     node = node_factory.get_node(options={"plugin": get_plugin})
 
-    node.rpc.setconfig("vitality-telegram-token", "test")
+    node.rpc.setconfig("vitality-smtp-username", "test")
     assert (
-        node.rpc.listconfigs("vitality-telegram-token")["configs"][
-            "vitality-telegram-token"
+        node.rpc.listconfigs("vitality-smtp-username")["configs"][
+            "vitality-smtp-username"
         ]["value_str"]
         == "test"
-    )
-
-    node.rpc.setconfig("vitality-telegram-usernames", "userA, userB")
-    assert (
-        node.rpc.listconfigs("vitality-telegram-usernames")["configs"][
-            "vitality-telegram-usernames"
-        ]["value_str"]
-        == "userA, userB"
     )
 
     with pytest.raises(RpcError, match="is not a valid integer"):
@@ -117,9 +83,7 @@ def test_options(node_factory, get_plugin):  # noqa: F811
     node.rpc.setconfig("vitality-amboss", False)
     with pytest.raises(RpcError) as err:
         node.rpc.setconfig("vitality-amboss", "test")
-    assert (
-        err.value.error["message"] == "vitality-amboss is not a valid boolean!"
-    )
+    assert err.value.error["message"] == "vitality-amboss is not a valid boolean!"
     assert err.value.error["code"] == -32602
     assert (
         node.rpc.listconfigs("vitality-amboss")["configs"]["vitality-amboss"][
