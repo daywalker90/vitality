@@ -3,21 +3,20 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use cln_plugin::Plugin;
 use lettre::{
+    AsyncSmtpTransport,
+    AsyncTransport,
+    Message,
+    Tokio1Executor,
     message::header::ContentType,
     transport::smtp::{
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
-    AsyncSmtpTransport,
-    AsyncTransport,
-    Message,
-    Tokio1Executor,
 };
-use log::{info, warn};
-use teloxide::{requests::Requester, Bot};
+use log::info;
 
 use crate::structs::{Config, PluginState};
 
@@ -44,8 +43,8 @@ use crate::structs::{Config, PluginState};
 
 pub async fn send_mail(
     config: &Config,
-    subject: &String,
-    body: &String,
+    subject: String,
+    body: String,
     html: bool,
 ) -> Result<(), Error> {
     let header = if html {
@@ -59,7 +58,7 @@ pub async fn send_mail(
         .to(config.email_to.parse().unwrap())
         .subject(subject.clone())
         .header(header)
-        .body(body.to_string())
+        .body(body)
         .unwrap();
 
     let creds = Credentials::new(config.smtp_username.clone(), config.smtp_password.clone());
@@ -84,23 +83,8 @@ pub async fn send_mail(
         );
         Ok(())
     } else {
-        Err(anyhow!("Failed to send email: {:?}", result))
+        Err(anyhow!("Failed to send email: {result:?}"))
     }
-}
-
-pub async fn send_telegram(config: &Config, subject: &String, body: &String) -> Result<(), Error> {
-    let bot = Bot::new(config.telegram_token.clone());
-
-    for username in &config.telegram_usernames {
-        let mut message = format!("{}\n{}", subject, body);
-        if message.len() > 4000 {
-            message = message[..4000].to_string()
-        }
-        if let Err(e) = bot.send_message(username.clone(), message).await {
-            warn!("Error sending telegram to {}: {}", username, e);
-        };
-    }
-    Ok(())
 }
 
 pub fn make_rpc_path(plugin: &Plugin<PluginState>) -> PathBuf {
@@ -113,29 +97,4 @@ pub fn parse_boolean(s: &str) -> Option<bool> {
         "false" | "0" => Some(false),
         _ => None,
     }
-}
-
-pub fn at_or_above_version(my_version: &str, min_version: &str) -> Result<bool, Error> {
-    let clean_start_my_version = my_version.trim_start_matches('v');
-    let full_clean_my_version: String = clean_start_my_version
-        .chars()
-        .take_while(|x| x.is_ascii_digit() || *x == '.')
-        .collect();
-
-    let my_version_parts: Vec<&str> = full_clean_my_version.split('.').collect();
-    let min_version_parts: Vec<&str> = min_version.split('.').collect();
-
-    if my_version_parts.len() <= 1 || my_version_parts.len() > 3 {
-        return Err(anyhow!("Version string parse error: {}", my_version));
-    }
-    for (my, min) in my_version_parts.iter().zip(min_version_parts.iter()) {
-        let my_num: u32 = my.parse()?;
-        let min_num: u32 = min.parse()?;
-
-        if my_num != min_num {
-            return Ok(my_num > min_num);
-        }
-    }
-
-    Ok(my_version_parts.len() >= min_version_parts.len())
 }

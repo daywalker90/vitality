@@ -1,8 +1,9 @@
 use std::{collections::HashMap, env, time::Duration};
 
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use cln_plugin::Plugin;
 use cln_rpc::{
+    ClnRpc,
     model::{
         requests::{
             ConnectRequest,
@@ -15,16 +16,16 @@ use cln_rpc::{
         responses::{ListchannelsChannels, ListpeerchannelsChannels},
     },
     primitives::{ChannelState, PublicKey, ShortChannelId},
-    ClnRpc,
 };
 use log::{debug, info, warn};
 use tokio::time::{self, Instant};
 
 use crate::{
     structs::{Config, PluginState},
-    util::{make_rpc_path, parse_boolean, send_mail, send_telegram},
+    util::{make_rpc_path, parse_boolean, send_mail},
 };
 
+#[allow(clippy::too_many_lines)]
 async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
     let now = Instant::now();
     info!("check_channel: Starting");
@@ -66,21 +67,21 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         &config,
         &mut peer_slackers,
         current_blockheight,
-        &gossip,
+        gossip.as_ref(),
     )?;
 
     let peer_map = channels
         .into_iter()
         .map(|channel| (channel.peer_id, channel))
         .collect::<HashMap<PublicKey, ListpeerchannelsChannels>>();
-    for (peer, status) in peer_slackers.iter_mut() {
+    for (peer, status) in &mut peer_slackers {
         let connected = if let Some(p) = peer_map.get(peer) {
             p.peer_connected
         } else {
             continue;
         };
         if connected {
-            info!("check_channel: disconnecting from: {}", peer);
+            info!("check_channel: disconnecting from: {peer}");
             match rpc
                 .call_typed(&DisconnectRequest {
                     id: *peer,
@@ -98,9 +99,9 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
                     );
                     status.push(format!("Could not disconnect: {}", de.message));
                 }
-            };
+            }
         } else {
-            info!("check_channel: already disconnected from: {}", peer);
+            info!("check_channel: already disconnected from: {peer}");
         }
     }
 
@@ -109,7 +110,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         time::sleep(Duration::from_secs(10)).await;
     }
 
-    for (peer, status) in peer_slackers.iter_mut() {
+    for (peer, status) in &mut peer_slackers {
         match rpc
             .call_typed(&ConnectRequest {
                 id: peer.to_string(),
@@ -119,7 +120,7 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
             .await
         {
             Ok(_o) => {
-                info!("check_channel: connect successful: {}", peer);
+                info!("check_channel: connect successful: {peer}");
             }
             Err(ce) => {
                 info!(
@@ -156,18 +157,23 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         &config,
         &mut peer_slackers,
         current_blockheight,
-        &gossip,
+        gossip.as_ref(),
     )?;
 
-    if !peer_slackers.is_empty() {
+    if peer_slackers.is_empty() {
+        info!(
+            "check_channel: All good. Duration: {}s",
+            now.elapsed().as_secs()
+        );
+    } else {
         let final_peer_slackers: Vec<String> = peer_slackers
             .into_iter()
             .map(|(p, s)| {
                 let concatenated_string = s.join("\n");
                 if let Some(alias) = alias_map.get(&p) {
-                    format!("{} ({}):\n{}\n", p, alias, concatenated_string)
+                    format!("{p} ({alias}):\n{concatenated_string}\n")
                 } else {
-                    format!("{}:\n{}\n", p, concatenated_string)
+                    format!("{p}:\n{concatenated_string}\n")
                 }
             })
             .collect();
@@ -178,27 +184,20 @@ async fn check_channel(plugin: Plugin<PluginState>) -> Result<(), Error> {
         let subject = "Channel check report\n".to_string();
         let body = final_peer_slackers.join("\n");
         if config.send_mail {
-            send_mail(&config, &subject, &body, false).await?;
+            send_mail(&config, subject, body, false).await?;
         }
-        if config.send_telegram {
-            send_telegram(&config, &subject, &body).await?;
-        }
-    } else {
-        info!(
-            "check_channel: All good. Duration: {}s",
-            now.elapsed().as_secs()
-        );
     }
 
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 fn check_slackers(
     channels: &Vec<ListpeerchannelsChannels>,
     config: &Config,
     peer_slackers: &mut HashMap<PublicKey, Vec<String>>,
     current_blockheight: u32,
-    gossip: &Option<HashMap<ShortChannelId, Vec<ListchannelsChannels>>>,
+    gossip: Option<&HashMap<ShortChannelId, Vec<ListchannelsChannels>>>,
 ) -> Result<(), anyhow::Error> {
     for chan in channels {
         match chan.state {
@@ -217,7 +216,7 @@ fn check_slackers(
                             update_slackers(
                                 peer_slackers,
                                 chan.peer_id,
-                                format!("Peer won't lockin our channel. Status: {}", status),
+                                format!("Peer won't lockin our channel. Status: {status}"),
                             );
                         }
                         if status.contains("Sent reestablish, waiting for theirs") {
@@ -228,7 +227,7 @@ fn check_slackers(
                             update_slackers(
                                 peer_slackers,
                                 chan.peer_id,
-                                format!("Peer won't reestablish our channel. Status: {}", status),
+                                format!("Peer won't reestablish our channel. Status: {status}"),
                             );
                         }
                     }
@@ -237,8 +236,6 @@ fn check_slackers(
             ChannelState::CHANNELD_NORMAL | ChannelState::CHANNELD_AWAITING_SPLICE => {
                 if config.watch_channels {
                     let statuses = chan.status.as_ref().unwrap();
-                    let mut contained_reconnect = false;
-                    let mut specific_error_found = false;
                     for status in statuses {
                         if status.to_lowercase().contains("error") {
                             warn!(
@@ -251,11 +248,9 @@ fn check_slackers(
                                 chan.peer_id,
                                 format!(
                                     "Found peer with error in status but not \
-                                in closing state. Status: {}",
-                                    status
+                                in closing state. Status: {status}"
                                 ),
                             );
-                            specific_error_found = true;
                         }
                         if status.to_lowercase().contains("update_fee") {
                             warn!(
@@ -265,21 +260,16 @@ fn check_slackers(
                             update_slackers(
                                 peer_slackers,
                                 chan.peer_id,
-                                format!("Can't agree on fee. Status: {}", status),
+                                format!("Can't agree on fee. Status: {status}"),
                             );
-                            specific_error_found = true;
                         }
                         if status.to_lowercase().contains("htlc") {
                             warn!("check_channel: {} status: {}", chan.peer_id, status);
                             update_slackers(
                                 peer_slackers,
                                 chan.peer_id,
-                                format!("Status: {}", status),
+                                format!("Status: {status}"),
                             );
-                            specific_error_found = true;
-                        }
-                        if status.to_lowercase().contains("will attempt reconnect") {
-                            contained_reconnect = true;
                         }
                     }
                     if let Some(lost_state) = chan.lost_state {
@@ -296,29 +286,7 @@ fn check_slackers(
                                 i.e. lost some channel state")
                                     .to_string(),
                             );
-                            specific_error_found = true;
                         }
-                    }
-                    if !chan.peer_connected
-                        && !contained_reconnect
-                        && !config.is_at_or_above_24_11
-                        && !specific_error_found
-                    {
-                        warn!(
-                            "check_channel: Found disconnected peer that does not want to \
-                            reconnect: {} status instead is: {}",
-                            chan.peer_id,
-                            statuses.join("\n")
-                        );
-                        update_slackers(
-                            peer_slackers,
-                            chan.peer_id,
-                            format!(
-                                "Found disconnected peer that does not want to \
-                            reconnect. Status instead is: {}",
-                                statuses.join("\n")
-                            ),
-                        );
                     }
                 }
                 if config.expiring_htlcs > 0 {
@@ -430,7 +398,7 @@ fn check_slackers(
                     }
                 }
             }
-            _ => continue,
+            _ => (),
         }
     }
     Ok(())
@@ -487,7 +455,7 @@ fn update_slackers(
     status: String,
 ) {
     if let Some(slack) = peer_slackers.get_mut(&peer_id) {
-        slack.push(status)
+        slack.push(status);
     } else {
         peer_slackers.insert(peer_id, vec![status]);
     }
@@ -498,7 +466,7 @@ pub async fn check_channels_loop(plugin: Plugin<PluginState>) -> Result<(), Erro
     if let Ok(dbg) = env::var("TEST_DEBUG") {
         if let Some(bl) = parse_boolean(&dbg) {
             if bl {
-                skip_sleep = true
+                skip_sleep = true;
             }
         }
     }
@@ -511,22 +479,17 @@ pub async fn check_channels_loop(plugin: Plugin<PluginState>) -> Result<(), Erro
             match check_channel(plugin.clone()).await {
                 Ok(_succ) => (),
                 Err(e) => {
-                    warn!("Error in check_channel: {}", e);
+                    warn!("Error in check_channel: {e}");
                     let config = plugin.state().config.lock().clone();
                     let subject = "Channel check error".to_string();
                     let body = e.to_string();
                     if config.send_mail {
-                        if let Err(e) = send_mail(&config, &subject, &body, false).await {
-                            warn!("check_channels_loop: Error sending mail: {}", e);
-                        };
-                    }
-                    if config.send_telegram {
-                        if let Err(e) = send_telegram(&config, &subject, &body).await {
-                            warn!("check_channels_loop: Error sending telegram: {}", e);
-                        };
+                        if let Err(e) = send_mail(&config, subject, body, false).await {
+                            warn!("check_channels_loop: Error sending mail: {e}");
+                        }
                     }
                 }
-            };
+            }
         }
         time::sleep(Duration::from_secs(3_600)).await;
     }

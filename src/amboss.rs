@@ -1,17 +1,16 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use chrono::Utc;
 use cln_plugin::Plugin;
-use cln_rpc::{model::requests::SignmessageRequest, ClnRpc};
+use cln_rpc::{ClnRpc, model::requests::SignmessageRequest};
 use log::{info, warn};
-use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::time::{self, Instant};
 
 use crate::{
     structs::PluginState,
-    util::{make_rpc_path, send_mail, send_telegram},
+    util::{make_rpc_path, send_mail},
 };
 
 async fn amboss_ping(plugin: Plugin<PluginState>) -> Result<(), Error> {
@@ -23,7 +22,7 @@ async fn amboss_ping(plugin: Plugin<PluginState>) -> Result<(), Error> {
 
     let url = "https://api.amboss.space/graphql";
     let timestamp = Utc::now().format("%Y-%m-%dT%H:%M:%S%z").to_string();
-    info!("Timestamp: {}", timestamp);
+    info!("Timestamp: {timestamp}");
 
     let signature = rpc
         .call_typed(&SignmessageRequest {
@@ -44,16 +43,14 @@ async fn amboss_ping(plugin: Plugin<PluginState>) -> Result<(), Error> {
     });
 
     info!("Sending ping...");
-    let client = Client::new();
-    let response = client
-        .post(url)
-        .header("Content-Type", "application/json")
-        .body(json_data.to_string())
-        .send()
+    let response = bitreq::post(url)
+        .with_header("Content-Type", "application/json")
+        .with_body(json_data.to_string())
+        .send_async()
         .await?;
 
-    let response_text = response.text().await?;
-    let json: Value = serde_json::from_str(&response_text)?;
+    let response_text = response.as_str()?;
+    let json: Value = serde_json::from_str(response_text)?;
     let mut health_check_success = false;
     if let Some(data) = json.get("data") {
         if let Some(health_check) = data.get("healthCheck") {
@@ -68,7 +65,7 @@ async fn amboss_ping(plugin: Plugin<PluginState>) -> Result<(), Error> {
         info!("Amboss ping succeeded in: {}ms", now.elapsed().as_millis());
         Ok(())
     } else {
-        Err(anyhow!("Amboss ping error: {}", response_text))
+        Err(anyhow!("Amboss ping error: {response_text}"))
     }
 }
 
@@ -79,7 +76,7 @@ pub async fn amboss_ping_loop(plugin: Plugin<PluginState>) -> Result<(), Error> 
             match amboss_ping(plugin.clone()).await {
                 Ok(_succ) => sleep_time_s = 300,
                 Err(e) => {
-                    warn!("Error in amboss_ping: {}", e);
+                    warn!("Error in amboss_ping: {e}");
 
                     if sleep_time_s >= 300 {
                         sleep_time_s = 10;
@@ -88,19 +85,14 @@ pub async fn amboss_ping_loop(plugin: Plugin<PluginState>) -> Result<(), Error> 
                         let subject = "Amboss error".to_string();
                         let body = e.to_string();
                         if config.send_mail {
-                            if let Err(e) = send_mail(&config, &subject, &body, false).await {
-                                warn!("amboss_ping_loop: Error sending mail: {}", e);
-                            };
-                        }
-                        if config.send_telegram {
-                            if let Err(e) = send_telegram(&config, &subject, &body).await {
-                                warn!("amboss_ping_loop: Error sending telegram: {}", e);
-                            };
+                            if let Err(e) = send_mail(&config, subject, body, false).await {
+                                warn!("amboss_ping_loop: Error sending mail: {e}");
+                            }
                         }
                         sleep_time_s += 10;
                     }
                 }
-            };
+            }
         }
         time::sleep(Duration::from_secs(sleep_time_s)).await;
     }
