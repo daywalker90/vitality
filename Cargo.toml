@@ -21,7 +21,7 @@ cln-plugin = "0.7"
 # cln-plugin = { path = "../lightning/plugins/", version = "^0.6" }
 
 chrono = "0.4"
-bitreq = { version = "0.3", features = ["async-https"] }
+bitreq = { version = "0.4", features = ["async-https"] }
 
 parking_lot = "0.12"
 
