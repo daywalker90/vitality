@@ -60,7 +60,9 @@ def test_options(node_factory, get_plugin):  # noqa: F811
             "vitality-smtp-port": 100000,
         }
     )
-    assert node.daemon.is_in_log(r"out of range integral type conversion attempted")
+    assert node.daemon.is_in_log(
+        r"out of range integral type conversion attempted|number too large to fit in target type"
+    )
 
     node = node_factory.get_node(options={"plugin": get_plugin})
 
@@ -75,7 +77,8 @@ def test_options(node_factory, get_plugin):  # noqa: F811
     with pytest.raises(RpcError, match="is not a valid integer"):
         node.rpc.setconfig("vitality-smtp-port", "test")
     with pytest.raises(
-        RpcError, match="out of range integral type conversion attempted"
+        RpcError,
+        match="out of range integral type conversion attempted|number too large to fit in target type",
     ):
         node.rpc.setconfig("vitality-smtp-port", 99999)
     node.rpc.setconfig("vitality-smtp-port", 9999)
